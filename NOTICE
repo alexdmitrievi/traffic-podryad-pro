@@ -1,0 +1,30 @@
+Pipupi (traffic-podryad-pro)
+Copyright 2026 Pipupi
+
+This product includes software developed as part of the Vibe Coding Template.
+
+Vibe Coding Template
+Copyright 2026 Dima Sukharev
+
+Original author: Dima Sukharev
+GitHub: https://github.com/di-sukharev
+Original repository: https://github.com/di-sukharev/vibe
+Licensed under the Apache License, Version 2.0.
+
+This repository is derived from the Vibe Coding Template. Portions of the
+repository structure, architecture documentation, agent instructions, tooling
+configuration, and engineering conventions originate from that template and
+have been modified for this project.
+
+Modifications made by Pipupi include, but are not limited to:
+- a domain model for marketing service requests, SEO content production,
+  lead capture, and first-party attribution;
+- provider ports and adapter boundaries for LLM, keyword sources, and
+  publishing targets;
+- compliance rules that forbid outbound messaging capabilities in the MVP;
+- deployment documentation targeting Yandex Cloud as the only platform.
+
+No source code, configuration, credentials, or documentation from
+https://github.com/alexdmitrievi/Podryad_PRO has been copied into this
+repository. That repository is referenced for domain knowledge only and has
+no declared license.
