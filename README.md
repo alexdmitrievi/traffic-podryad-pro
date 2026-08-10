@@ -118,7 +118,7 @@ service request (seo_content)
 | --- | --- |
 | Runtime | Bun (версия пиновая в `.bun-version`) |
 | Монорепозиторий | Bun workspaces: `backend`, `webapp`, `website`, `packages/*` |
-| Локальная БД | Docker Compose, `postgres:18-alpine` + `pgvector` |
+| Локальная БД | Docker Compose, `postgres:18-alpine` + `pgvector`. Продакшн-возможности Managed PostgreSQL проверяются отдельно — см. verification gate в [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 | Проверки | `architecture:check`, `typecheck`, unit / contract / integration, Playwright |
 
 Требования к локальной базе — в [docs/LOCAL_DATABASE.md](docs/LOCAL_DATABASE.md), к тестам — в [docs/TESTING.md](docs/TESTING.md).
