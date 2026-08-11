@@ -1,0 +1,20 @@
+{
+  "$comment": "Geography for the first workspace. A tree: country -> federal district -> city. The subject level is deliberately absent until a real keyword needs it — importing a full administrative directory up front produces hundreds of rows nothing references. Regions are generic infrastructure, not petroleum-specific: a second vertical reuses this file unchanged.",
+  "regions": [
+    { "code": "ru", "name": "Россия", "kind": "country", "parent": null },
+
+    { "code": "sfo", "name": "Сибирский федеральный округ", "kind": "federal_district", "parent": "ru" },
+    { "code": "omsk", "name": "Омск", "kind": "city", "parent": "sfo" },
+    { "code": "novosibirsk", "name": "Новосибирск", "kind": "city", "parent": "sfo" },
+    { "code": "kemerovo", "name": "Кемерово", "kind": "city", "parent": "sfo" },
+    { "code": "krasnoyarsk", "name": "Красноярск", "kind": "city", "parent": "sfo" },
+    { "code": "barnaul", "name": "Барнаул", "kind": "city", "parent": "sfo" },
+    { "code": "irkutsk", "name": "Иркутск", "kind": "city", "parent": "sfo" },
+
+    { "code": "ufo", "name": "Уральский федеральный округ", "kind": "federal_district", "parent": "ru" },
+    { "code": "tyumen", "name": "Тюмень", "kind": "city", "parent": "ufo" },
+    { "code": "yekaterinburg", "name": "Екатеринбург", "kind": "city", "parent": "ufo" },
+    { "code": "chelyabinsk", "name": "Челябинск", "kind": "city", "parent": "ufo" },
+    { "code": "kurgan", "name": "Курган", "kind": "city", "parent": "ufo" }
+  ]
+}

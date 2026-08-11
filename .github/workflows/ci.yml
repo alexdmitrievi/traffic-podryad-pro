@@ -59,10 +59,19 @@ jobs:
       # fixture must fail and an allowed one must pass — so a checker cannot be gutted
       # without turning this job red.
       - name: Repository script tests
-        run: bun test scripts/
+        run: bun run test:scripts
 
-      - name: Workspace tests
-        run: bun run --filter '*' --sequential test
+      - name: Contract tests
+        run: bun run test:contracts
+
+      # Structural assertions on schema.prisma: workspace scoping, UUIDv7 keys, the
+      # NOT NULL approval on publications, the absence of vector columns, and every enum
+      # matching its counterpart in @traffic/contracts.
+      - name: Schema and seed tests
+        run: bun run test:schema
+
+      - name: Catalog seed data
+        run: bun run seed:check
 
   typecheck:
     name: Typecheck
@@ -77,11 +86,33 @@ jobs:
       - name: Install workspace
         run: bun install --frozen-lockfile
 
-      # Placeholder while no workspace has TypeScript sources. scripts/repo-env.mjs fails
-      # the guards job if a workspace gains sources while its typecheck is still an echo,
-      # so this cannot stay vacuous once Wave 3 lands.
+      # Real for @traffic/contracts, still a placeholder for the surfaces that have no
+      # TypeScript yet. scripts/repo-env.mjs fails the guards job if a workspace gains
+      # sources while its typecheck is still an echo, so a placeholder cannot outlive its
+      # workspace being empty.
       - name: Typecheck workspaces
         run: bun run typecheck
+
+  schema:
+    name: Prisma schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      # Parses and validates the schema. No database is contacted: Prisma 7 keeps connection
+      # URLs out of the schema entirely, and no migration exists in this wave.
+      - name: Validate schema
+        run: bun run prisma:validate
+
+      - name: Generate client
+        run: bun run prisma:generate
 
   build:
     name: Build

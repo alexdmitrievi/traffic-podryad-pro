@@ -10,8 +10,15 @@
     }
   },
   "scripts": {
-    "typecheck": "echo '@traffic/contracts: no TypeScript sources yet (Wave 3)'",
-    "build": "echo '@traffic/contracts: nothing to build yet (Wave 3)'",
-    "test": "echo '@traffic/contracts: no tests yet (Wave 3)'"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.11",
+    "typescript": "~7.0.2"
   }
 }

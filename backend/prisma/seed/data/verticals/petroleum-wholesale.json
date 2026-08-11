@@ -1,0 +1,102 @@
+{
+  "$comment": "THE FIRST WORKSPACE, NOT A UNIVERSAL TRUTH. Pipupi is a marketing product; wholesale petroleum distribution is the niche we validate the SEO slice on. This file is data, not structure — a second vertical is another file next to this one plus a workspace row, with no schema change and no code change. Nothing here is petroleum-specific at the type level.",
+
+  "$factualPolicy": "Product entries carry a common name, a unit of sale and colloquial synonyms — nothing else. There is deliberately no grade, specification, standard, temperature range, density, sulphur content, delivery term or price anywhere in this file, and the schema has no column for one. Those are facts a person verifies against a source before publication; a field here would invite a model to fill it. Specific trade designations are added by a human from a confirmed source. Until then a position lives under the general name of its category, and that is a normal working state, not an omission. See docs/PETROLEUM_TAXONOMY.md.",
+
+  "vertical": {
+    "code": "petroleum_wholesale",
+    "name": "Оптовая дистрибуция нефтепродуктов",
+    "description": "Первая тестовая ниша Pipupi: оптовая реализация нефтепродуктов по СФО и УФО."
+  },
+
+  "categories": [
+    {
+      "code": "diesel_fuel",
+      "name": "Дизельное топливо",
+      "slug": "dizelnoe-toplivo",
+      "position": 10,
+      "products": [
+        { "name": "Дизельное топливо", "slug": "dizelnoe-toplivo", "unit": "tonne", "synonyms": ["ДТ", "дизель", "солярка", "дизтопливо"] }
+      ]
+    },
+    {
+      "code": "gasoline",
+      "name": "Бензины",
+      "slug": "benziny",
+      "position": 20,
+      "products": [
+        { "name": "Бензин автомобильный", "slug": "benzin-avtomobilnyy", "unit": "tonne", "synonyms": ["бензин", "автобензин"] }
+      ]
+    },
+    {
+      "code": "fuel_oil",
+      "name": "Мазут",
+      "slug": "mazut",
+      "position": 30,
+      "products": [
+        { "name": "Мазут топочный", "slug": "mazut-topochnyy", "unit": "tonne", "synonyms": ["мазут", "топочный мазут"] }
+      ]
+    },
+    {
+      "code": "bitumen",
+      "name": "Битумы",
+      "slug": "bitumy",
+      "position": 40,
+      "products": [
+        { "name": "Битум нефтяной", "slug": "bitum-neftyanoy", "unit": "tonne", "synonyms": ["битум", "нефтебитум"] }
+      ]
+    },
+    {
+      "code": "lubricants",
+      "name": "Масла и смазочные материалы",
+      "slug": "masla-i-smazochnye-materialy",
+      "position": 50,
+      "products": [
+        { "name": "Масло индустриальное", "slug": "maslo-industrialnoe", "unit": "litre", "synonyms": ["индустриальное масло", "смазочные материалы"] }
+      ]
+    },
+    {
+      "code": "lpg",
+      "name": "Сжиженные углеводородные газы",
+      "slug": "szhizhennye-uglevodorodnye-gazy",
+      "position": 60,
+      "products": [
+        { "name": "Сжиженный углеводородный газ", "slug": "szhizhennyy-uglevodorodnyy-gaz", "unit": "tonne", "synonyms": ["СУГ", "сжиженный газ", "пропан-бутан"] }
+      ]
+    },
+    {
+      "code": "kerosene",
+      "name": "Керосины",
+      "slug": "kerosiny",
+      "position": 70,
+      "products": [
+        { "name": "Керосин", "slug": "kerosin", "unit": "tonne", "synonyms": ["керосин"] }
+      ]
+    },
+    {
+      "code": "heating_oil",
+      "name": "Печное топливо",
+      "slug": "pechnoe-toplivo",
+      "position": 80,
+      "products": [
+        { "name": "Печное топливо", "slug": "pechnoe-toplivo", "unit": "tonne", "synonyms": ["печное топливо", "топливо печное бытовое"] }
+      ]
+    },
+    {
+      "code": "marine_fuel",
+      "name": "Судовое топливо",
+      "slug": "sudovoe-toplivo",
+      "position": 90,
+      "products": [
+        { "name": "Судовое топливо", "slug": "sudovoe-toplivo", "unit": "tonne", "synonyms": ["судовое топливо", "бункерное топливо"] }
+      ]
+    }
+  ],
+
+  "$deliveryBasesComment": "Picker labels for the lead form, describing how the goods move. They carry no contractual meaning — terms, timing, liability and settlement live in a contract, never in a reference table. Confirm against the company's actual practice before the form goes live.",
+  "deliveryBases": [
+    { "code": "pickup", "name": "Самовывоз", "position": 10 },
+    { "code": "road_transport", "name": "Доставка автотранспортом", "position": 20 },
+    { "code": "rail_transport", "name": "Отгрузка железнодорожным транспортом", "position": 30 }
+  ]
+}

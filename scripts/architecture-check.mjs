@@ -22,11 +22,18 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 /** Directories whose sources participate in import-boundary rules. */
 export const sourceRoots = [
   'backend/src',
+  'backend/prisma',
   'packages/contracts/src',
   'webapp/src',
   'website/src',
   'scripts',
 ]
+
+/**
+ * Directories skipped while walking. `generated` holds machine-written output — the Prisma
+ * client is ~3 MB of it — which no human wrote and no boundary rule applies to.
+ */
+const skippedDirectories = new Set(['node_modules', 'generated', 'dist', 'build', 'coverage'])
 
 /** Manifests scanned for forbidden dependency declarations (AC-3). */
 export const manifestGlobRoots = ['.', 'backend', 'webapp', 'website', 'packages/contracts']
@@ -437,7 +444,7 @@ async function collectSourceFiles(directory) {
 
   const files = []
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+    if (skippedDirectories.has(entry.name) || entry.name.startsWith('.')) continue
     const entryPath = path.join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await collectSourceFiles(entryPath)))
     else if (sourceExtension.test(entry.name)) files.push(entryPath)

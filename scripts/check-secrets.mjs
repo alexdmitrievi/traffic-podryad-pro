@@ -24,6 +24,10 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const skippedDirectories = new Set([
   '.git',
   'node_modules',
+  // Generated build output: the Prisma client alone is ~3 MB of machine-written TypeScript.
+  // Scanning it finds nothing a human could have leaked and costs more than the whole rest
+  // of the sweep, which is how a check ends up being switched off.
+  'generated',
   'dist',
   'build',
   'coverage',

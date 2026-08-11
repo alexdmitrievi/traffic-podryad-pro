@@ -17,7 +17,7 @@
     "check:repo-env": "bun scripts/repo-env.mjs",
     "check:secrets": "bun scripts/check-secrets.mjs",
     "architecture:check": "bun scripts/architecture-check.mjs",
-    "test": "bun run test:scripts",
+    "test": "bun run test:scripts && bun run test:contracts && bun run test:schema",
     "test:scripts": "bun test scripts/",
     "typecheck": "bun run --filter '*' --sequential typecheck",
     "build": "bun run --filter '*' --sequential build",
@@ -25,6 +25,11 @@
     "db:start:test": "docker compose --env-file backend/.env up -d postgres_test",
     "db:stop": "docker compose --env-file backend/.env down",
     "db:status": "docker compose --env-file backend/.env ps",
-    "compose:config": "docker compose --env-file backend/.env.example config --quiet"
+    "compose:config": "docker compose --env-file backend/.env.example config --quiet",
+    "test:contracts": "bun test packages/contracts/src",
+    "test:schema": "bun test backend/prisma",
+    "prisma:validate": "bun run --cwd backend prisma:validate",
+    "prisma:generate": "bun run --cwd backend prisma:generate",
+    "seed:check": "bun backend/prisma/seed/index.mjs"
   }
 }

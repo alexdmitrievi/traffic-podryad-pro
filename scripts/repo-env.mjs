@@ -226,6 +226,46 @@ export function checkRepositoryState(input) {
     }
   }
 
+  // ── Contracts are the source of truth and stay dependency-light ───────────
+  const contractsManifest = workspaceManifests.find(
+    (entry) => entry.manifest?.name === '@traffic/contracts',
+  )?.manifest
+  if (contractsManifest) {
+    const runtimeDependencies = Object.keys(contractsManifest.dependencies ?? {})
+    if (!runtimeDependencies.includes('zod')) {
+      fail('contracts', '@traffic/contracts must depend on zod: the schemas are the contract')
+    }
+    for (const dependency of runtimeDependencies) {
+      if (dependency !== 'zod') {
+        fail(
+          'contracts',
+          `@traffic/contracts declares runtime dependency "${dependency}"; contracts carry schemas, not frameworks, persistence or provider SDKs`,
+        )
+      }
+    }
+  }
+
+  // ── The catalog stays a module, not a hardcoded niche ─────────────────────
+  // Petroleum is the first workspace, not the product's specialisation. If a niche name
+  // reaches the schema or the contracts, the second vertical becomes a migration.
+  const nicheTerms = ['petroleum', 'нефтепродукт', 'diesel', 'дизель', 'benzin', 'бензин', 'mazut', 'мазут']
+  for (const entry of prismaSources) {
+    const declarations = entry.source
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .join('\n')
+      .toLowerCase()
+
+    for (const term of nicheTerms) {
+      if (declarations.includes(term)) {
+        fail(
+          'catalog-genericity',
+          `${entry.path} names the niche "${term}" in a declaration; the catalog is generic and petroleum belongs in seed data`,
+        )
+      }
+    }
+  }
+
   // ── Placeholder scripts must not outlive their workspace's sources ────────
   // A `typecheck` that echoes is honest while a workspace has no TypeScript. The moment it
   // has some, an echoing typecheck is a green check that verifies nothing.
@@ -264,7 +304,10 @@ async function collectFiles(directory, predicate) {
 
   const files = []
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === '.git') continue
+    // `generated` holds the Prisma client, which is git-ignored build output. Counting it as
+    // workspace source would make the placeholder-script rule fire on a backend that still
+    // has no hand-written TypeScript.
+    if (['node_modules', '.git', 'generated', 'dist', 'build'].includes(entry.name)) continue
     const entryPath = path.join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await collectFiles(entryPath, predicate)))
     else if (predicate(entry.name)) files.push(entryPath)

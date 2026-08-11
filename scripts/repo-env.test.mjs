@@ -53,7 +53,15 @@ function healthyInput(overrides = {}) {
       { path: 'backend/package.json', manifest: { name: '@traffic/backend', scripts: { typecheck: 'echo x' } } },
       { path: 'webapp/package.json', manifest: { name: '@traffic/webapp', scripts: { typecheck: 'echo x' } } },
       { path: 'website/package.json', manifest: { name: '@traffic/website', scripts: { typecheck: 'echo x' } } },
-      { path: 'packages/contracts/package.json', manifest: { name: '@traffic/contracts', scripts: { typecheck: 'echo x' } } },
+      {
+        path: 'packages/contracts/package.json',
+        manifest: {
+          name: '@traffic/contracts',
+          scripts: { typecheck: 'echo x' },
+          dependencies: { zod: '^4.4.3' },
+          devDependencies: { typescript: '~7.0.2' },
+        },
+      },
     ],
     environmentTemplate: healthyEnvironment,
     composeFile: healthyCompose,
@@ -319,6 +327,96 @@ describe('placeholder scripts', () => {
         sourceFilesByWorkspace: { backend: 12, webapp: 0, website: 0, 'packages/contracts': 0 },
       }),
     )
+    expect(problems).toEqual([])
+  })
+})
+
+describe('contracts stay the source of truth', () => {
+  function withContractsManifest(manifest) {
+    return healthyInput().workspaceManifests.map((entry) =>
+      entry.path === 'packages/contracts/package.json' ? { ...entry, manifest } : entry,
+    )
+  }
+
+  test('contracts without zod are reported', () => {
+    const manifests = withContractsManifest({
+      name: '@traffic/contracts',
+      scripts: { typecheck: 'echo x' },
+    })
+
+    expect(rulesFrom(checkRepositoryState(healthyInput({ workspaceManifests: manifests })))).toContain(
+      'contracts',
+    )
+  })
+
+  test('a framework or provider dependency in contracts is reported', () => {
+    for (const dependency of ['hono', 'react', '@prisma/client', 'openai']) {
+      const manifests = withContractsManifest({
+        name: '@traffic/contracts',
+        scripts: { typecheck: 'echo x' },
+        dependencies: { zod: '^4.4.3', [dependency]: '^1.0.0' },
+      })
+
+      const problems = checkRepositoryState(healthyInput({ workspaceManifests: manifests }))
+      expect(rulesFrom(problems)).toContain('contracts')
+      expect(problems.some((problem) => problem.message.includes(dependency))).toBe(true)
+    }
+  })
+
+  test('typescript as a devDependency is fine', () => {
+    expect(checkRepositoryState(healthyInput())).toEqual([])
+  })
+})
+
+describe('the catalog stays generic', () => {
+  const niches = ['petroleum', 'нефтепродукт', 'diesel', 'дизель', 'бензин', 'мазут']
+
+  for (const term of niches) {
+    test(`a niche name "${term}" declared in the schema is reported`, () => {
+      const problems = checkRepositoryState(
+        healthyInput({
+          prismaSources: [
+            {
+              path: 'backend/prisma/schema.prisma',
+              source: `model ${term}Product {\n  id String @id\n}`,
+            },
+          ],
+        }),
+      )
+
+      expect(rulesFrom(problems)).toContain('catalog-genericity')
+    })
+  }
+
+  test('a niche named in a comment is not a violation', () => {
+    // The schema explains that petroleum is the first workspace. Explaining the rule must
+    // not trip it — only a declaration does.
+    const problems = checkRepositoryState(
+      healthyInput({
+        prismaSources: [
+          {
+            path: 'backend/prisma/schema.prisma',
+            source: '// Petroleum wholesale is the first vertical, a row in verticals.\nmodel Vertical {\n  id String @id\n}',
+          },
+        ],
+      }),
+    )
+
+    expect(problems).toEqual([])
+  })
+
+  test('a generic catalog schema passes', () => {
+    const problems = checkRepositoryState(
+      healthyInput({
+        prismaSources: [
+          {
+            path: 'backend/prisma/schema.prisma',
+            source: 'model Vertical {\n  id String @id\n  code String\n}\n\nmodel Product {\n  id String @id\n}',
+          },
+        ],
+      }),
+    )
+
     expect(problems).toEqual([])
   })
 })
