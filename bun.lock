@@ -1,0 +1,34 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "traffic-podryad-pro",
+    },
+    "backend": {
+      "name": "@traffic/backend",
+      "version": "0.0.0",
+    },
+    "packages/contracts": {
+      "name": "@traffic/contracts",
+      "version": "0.0.0",
+    },
+    "webapp": {
+      "name": "@traffic/webapp",
+      "version": "0.0.0",
+    },
+    "website": {
+      "name": "@traffic/website",
+      "version": "0.0.0",
+    },
+  },
+  "packages": {
+    "@traffic/backend": ["@traffic/backend@workspace:backend"],
+
+    "@traffic/contracts": ["@traffic/contracts@workspace:packages/contracts"],
+
+    "@traffic/webapp": ["@traffic/webapp@workspace:webapp"],
+
+    "@traffic/website": ["@traffic/website@workspace:website"],
+  }
+}

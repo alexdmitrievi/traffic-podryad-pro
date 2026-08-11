@@ -1,0 +1,11 @@
+{
+  "name": "@traffic/backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "echo '@traffic/backend: no TypeScript sources yet (Wave 3/4)'",
+    "build": "echo '@traffic/backend: nothing to build yet (Wave 4)'",
+    "test": "echo '@traffic/backend: no tests yet (Wave 3/4)'"
+  }
+}

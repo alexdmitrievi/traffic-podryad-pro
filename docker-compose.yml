@@ -1,0 +1,52 @@
+# Local development infrastructure for Pipupi.
+#
+# Two PostgreSQL services from the same image: one for development, one for tests.
+# Both bind to 127.0.0.1 only — nothing here is reachable from the network.
+#
+# On pgvector: the official `postgres:18-alpine` image does NOT ship the `vector`
+# extension, so it is not enabled here. Nothing in the repository needs it yet —
+# there is no schema, no embedding column and no vector index (see the unresolved
+# production verification gate in docs/DEPLOYMENT.md section 3). The local image
+# choice for vector work is made in Wave 3, and only after that gate answers
+# whether the production cluster can support vectors at all. Switching this image
+# before then would fake a capability the production database may not have.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pipupi}
+      POSTGRES_USER: ${POSTGRES_USER:-pipupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pipupi_local_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-54329}:5432"
+    volumes:
+      - postgres_18_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pipupi} -d ${POSTGRES_DB:-pipupi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_test:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_TEST_DB:-pipupi_test}
+      POSTGRES_USER: ${POSTGRES_USER:-pipupi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pipupi_local_password}
+    ports:
+      # Configurable so parallel test runs on one machine do not collide.
+      - "127.0.0.1:${POSTGRES_TEST_PORT:-54330}:5432"
+    volumes:
+      - postgres_18_test_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pipupi} -d ${POSTGRES_TEST_DB:-pipupi_test}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_18_data:
+  postgres_18_test_data:

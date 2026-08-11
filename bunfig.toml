@@ -1,0 +1,4 @@
+[install]
+# Hoisted layout keeps a single node_modules tree at the repository root, so workspace
+# packages resolve each other and tooling that walks parent directories behaves predictably.
+linker = "hoisted"

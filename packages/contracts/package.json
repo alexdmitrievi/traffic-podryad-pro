@@ -1,0 +1,17 @@
+{
+  "name": "@traffic/contracts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "echo '@traffic/contracts: no TypeScript sources yet (Wave 3)'",
+    "build": "echo '@traffic/contracts: nothing to build yet (Wave 3)'",
+    "test": "echo '@traffic/contracts: no tests yet (Wave 3)'"
+  }
+}

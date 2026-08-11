@@ -1,0 +1,30 @@
+{
+  "name": "traffic-podryad-pro",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "packageManager": "bun@1.3.11",
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "webapp",
+    "website",
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "bun run check:agent-docs && bun run check:repo-env && bun run architecture:check && bun run check:secrets",
+    "check:agent-docs": "bun scripts/check-agent-docs.mjs",
+    "check:repo-env": "bun scripts/repo-env.mjs",
+    "check:secrets": "bun scripts/check-secrets.mjs",
+    "architecture:check": "bun scripts/architecture-check.mjs",
+    "test": "bun run test:scripts",
+    "test:scripts": "bun test scripts/",
+    "typecheck": "bun run --filter '*' --sequential typecheck",
+    "build": "bun run --filter '*' --sequential build",
+    "db:start": "docker compose --env-file backend/.env up -d postgres",
+    "db:start:test": "docker compose --env-file backend/.env up -d postgres_test",
+    "db:stop": "docker compose --env-file backend/.env down",
+    "db:status": "docker compose --env-file backend/.env ps",
+    "compose:config": "docker compose --env-file backend/.env.example config --quiet"
+  }
+}

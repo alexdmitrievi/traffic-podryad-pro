@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref: a red result for a commit nobody is looking at
+# any more only teaches people to ignore the badge.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.3.11"
+
+jobs:
+  # Repository-level checks. These are dependency-free on purpose and run without an
+  # install step, so a broken dependency tree can never disable them.
+  guards:
+    name: Repository guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Agent documentation identity (CLAUDE.md == AGENTS.md)
+        run: bun scripts/check-agent-docs.mjs
+
+      - name: Repository consistency
+        run: bun scripts/repo-env.mjs
+
+      - name: Architecture boundaries (AC-1, AC-2, AC-3)
+        run: bun scripts/architecture-check.mjs
+
+      - name: Secret scan
+        run: bun scripts/check-secrets.mjs
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      # Fixture tests for the checkers above. They assert both directions — a violating
+      # fixture must fail and an allowed one must pass — so a checker cannot be gutted
+      # without turning this job red.
+      - name: Repository script tests
+        run: bun test scripts/
+
+      - name: Workspace tests
+        run: bun run --filter '*' --sequential test
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      # Placeholder while no workspace has TypeScript sources. scripts/repo-env.mjs fails
+      # the guards job if a workspace gains sources while its typecheck is still an echo,
+      # so this cannot stay vacuous once Wave 3 lands.
+      - name: Typecheck workspaces
+        run: bun run typecheck
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      # Nothing produces artifacts yet; this becomes the website and webapp build in Wave 4.
+      - name: Build workspaces
+        run: bun run build
+
+  compose:
+    name: Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Validates and renders the compose file. Client-side only: no daemon, no images
+      # pulled, no containers started.
+      - name: Validate docker-compose.yml
+        run: docker compose --env-file backend/.env.example config --quiet
+
+      - name: Confirm the local database image is postgres:18-alpine
+        run: |
+          docker compose --env-file backend/.env.example config \
+            | grep -q 'image: postgres:18-alpine'

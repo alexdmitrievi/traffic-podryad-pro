@@ -4,8 +4,8 @@
 
 Смысл продукта в одной фразе: **превратить исследование поисковых запросов в проверяемый поток заявок**, где каждый лид можно проследить назад до конкретной статьи, кластера тем, ключевого запроса, продукта и региона.
 
-> **Статус репозитория: только документация и архитектурные решения.**
-> Прикладного кода, зависимостей, миграций и инфраструктуры здесь пока нет. Это Wave 1 — конституция репозитория. См. раздел [«Что будет реализовано дальше»](#что-будет-реализовано-дальше).
+> **Статус репозитория: каркас и правила, без прикладного кода.**
+> Есть Bun-воркспейс, локальная база в Docker Compose, проверки границ архитектуры и CI. Прикладного кода, схемы данных, миграций и внешних зависимостей пока нет. См. раздел [«Что будет реализовано дальше»](#что-будет-реализовано-дальше).
 
 ---
 
@@ -110,20 +110,32 @@ service request (seo_content)
 
 ## Локальная разработка
 
-**Сейчас: недоступна.** В репозитории нет `package.json`, зависимостей и исходного кода — запускать нечего.
-
-Что появится в Wave 2 и Wave 3:
-
 | Компонент | Инструмент |
 | --- | --- |
-| Runtime | Bun (версия пиновая в `.bun-version`) |
+| Runtime | Bun, версия запинена в `.bun-version` и в `packageManager` |
 | Монорепозиторий | Bun workspaces: `backend`, `webapp`, `website`, `packages/*` |
-| Локальная БД | Docker Compose, `postgres:18-alpine` + `pgvector`. Продакшн-возможности Managed PostgreSQL проверяются отдельно — см. verification gate в [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
-| Проверки | `architecture:check`, `typecheck`, unit / contract / integration, Playwright |
+| Локальная БД | Docker Compose, `postgres:18-alpine`, порт `54329`; отдельный тестовый сервис на `54330` |
+| Проверки | `architecture:check`, `check:secrets`, `check:agent-docs`, `check:repo-env`, `bun test` |
 
-Требования к локальной базе — в [docs/LOCAL_DATABASE.md](docs/LOCAL_DATABASE.md), к тестам — в [docs/TESTING.md](docs/TESTING.md).
+```bash
+bun install                 # связывает воркспейсы; внешних зависимостей пока нет
 
-Секреты в локальной разработке живут только в `.env`-файлах, которые не попадают в Git. В репозитории есть **только** `*.env.example` с плейсхолдерами.
+bun run check               # все репозиторные проверки разом
+bun run architecture:check  # границы модулей, AC-1..AC-3
+bun run test                # фикстурные тесты проверок
+bun run compose:config      # валидация docker-compose.yml без запуска демона
+
+cp backend/.env.example backend/.env
+bun run db:start            # локальный PostgreSQL
+bun run db:status
+bun run db:stop
+```
+
+Подробности — [docs/LOCAL_DATABASE.md](docs/LOCAL_DATABASE.md), тесты — [docs/TESTING.md](docs/TESTING.md).
+
+`pgvector` локально **не включён**: базовый образ `postgres:18-alpine` его не содержит, ничему в репозитории он пока не нужен, а продакшн-ворота не пройдены. Обоснование — [docs/LOCAL_DATABASE.md §2.1](docs/LOCAL_DATABASE.md), ворота — [docs/DEPLOYMENT.md §3](docs/DEPLOYMENT.md).
+
+Секреты живут только в `.env`-файлах, которые не попадают в Git. В репозитории — **только** `backend/.env.example` с плейсхолдерами; `bun run check:secrets` блокирует появление настоящих.
 
 ---
 
@@ -162,9 +174,9 @@ service request (seo_content)
 
 | Волна | Содержимое | Статус |
 | --- | --- | --- |
-| **Wave 1** | Конституция репозитория: лицензия, README, инструкции для агентов, чек-лист проекта, 13 документов с архитектурными решениями | ✅ этот коммит |
-| **Wave 2** | Каркас и принудительные правила: `package.json`, Bun workspaces, Docker Compose, `scripts/architecture-check.mjs` с правилами AC-1…AC-3, secret-scanning gate, CI | ожидает утверждения |
-| **Wave 3** | Контракты и схема данных: `packages/contracts`, `schema.prisma`, seed-данные регионов и товарной таксономии, `*.env.example` | — |
+| **Wave 1** | Конституция репозитория: лицензия, README, инструкции для агентов, чек-лист проекта, 13 документов с архитектурными решениями | ✅ |
+| **Wave 2** | Каркас и принудительные правила: Bun workspaces, Docker Compose, проверки границ с AC-1…AC-3 и фикстурными тестами, secret-gate, CI | ✅ |
+| **Wave 3** | Контракты и схема данных: Zod-схемы в `packages/contracts`, `schema.prisma`, сиды регионов и товарной таксономии | ожидает утверждения |
 | **Wave 4** | Модули backend, ports и adapters, `website`, `webapp`, сквозной E2E-тест SEO-среза | — |
 
 Каждая волна начинается только после явного утверждения предыдущей.
