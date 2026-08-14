@@ -88,6 +88,12 @@ service request (seo_content)
 
 Критерий готовности: на проде существует опубликованная статья, пришедший через её CTA лид и запись атрибуции, связывающая их, — и всё это воспроизводится одним E2E-тестом.
 
+> **Реализовано.** Конвейер работает сквозно; в генерации сейчас участвует
+> детерминированный fake-драйвер `LlmPort` (`LLM_PROVIDER=fake`), боевой DeepSeek
+> включается отдельным шагом после ревью границы ПДн и учёта стоимости
+> ([docs/WAVE_4_DELEGATION.md](docs/WAVE_4_DELEGATION.md) §6). PII-guard, `llm_runs` и
+> `LLM_MONTHLY_COST_CAP_RUB` работают уже сейчас.
+
 Пошаговое описание конвейера — в [docs/CONTENT_PIPELINE.md](docs/CONTENT_PIPELINE.md).
 
 ### Чего в MVP нет — намеренно
@@ -185,6 +191,59 @@ bun run db:stop
 | **Wave 4** | Модули backend, ports и adapters, `website`, `webapp`, сквозной E2E-тест SEO-среза | ✅ |
 
 Каждая волна начинается только после явного утверждения предыдущей.
+
+### Где мы остановились
+
+MVP-срез **работает локально целиком**: заявка `seo_content` → CSV-импорт → нормализация и
+лексическая кластеризация → бриф и черновик через outbox (детерминированный fake LLM) →
+правка → одобрение, привязанное к content hash → публикация (отказ без одобрения
+доказан тестом) → CTA-лид с согласием → атрибуция до ключа/продукта/региона → воронка.
+Всё воспроизводится сквозным E2E (`bun run e2e:webapp`) и интеграционными тестами
+(`bun run test:integration`). Боевой DeepSeek не включён: по решению
+[docs/WAVE_4_DELEGATION.md](docs/WAVE_4_DELEGATION.md) §6 он подключается отдельным
+шагом после ревью границы ПДн и учёта стоимости.
+
+### Следующие шаги, по порядку
+
+1. **Production verification gate PostgreSQL** — 8 пунктов на реальном кластере Yandex
+   Managed Service for PostgreSQL, фактический вывод команд записывается в
+   [CHECKLIST.md](CHECKLIST.md) §12.1. До закрытия ворот в схему не попадают векторные
+   колонки, и ничего не утверждается о `pgvector` в проде.
+2. **Реальный CSV ключей** для первой ниши (нефтепродукты, СФО/УФО) — конвейер не
+   проверяется на синтетике, см. [CHECKLIST.md](CHECKLIST.md) §12.2.
+3. **Боевой DeepSeek** — отдельный шаг после ревью: цены за токены, `llm_runs` уже
+   пишутся, `LLM_MONTHLY_COST_CAP_RUB` уже работает; live-сьют —
+   `backend/src/providers/llm/deepseek.live.test.ts` (нужен `DEEPSEEK_API_KEY`).
+4. **Развёртывание** по чек-листу [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §9: Managed
+   PostgreSQL, Object Storage, CDN, DNS/TLS по [docs/DOMAINS.md](docs/DOMAINS.md),
+   секреты в хранилище площадки. Staging с `X-Robots-Tag: noindex`.
+5. **GEO-волна (следующая крупная)** — расширение конвейера, не «хак»: реестр
+   `EvidenceSource`/`Claim`/`Citation` (подтверждённые факты до генерации драфта),
+   вопросный инвентарь `GEOQuery`, ручные снимки `GEOVisibilitySnapshot`, ответные
+   ассеты с цитатами. Без массовой генерации страниц и без манипуляций моделями.
+6. **Контент-фабрика** — `ContentVariant` от одного одобренного брифа: сайт-статья,
+   адаптация, сценарий, short-form, FAQ, GEO-ответ, CTA-блок; claims варианта обязаны
+   быть подмножеством verified claims канона.
+7. **Дзен** — Stage 1 ручная дистрибуция (адаптация из одобренного канона, UTM,
+   ссылка на канон). Автоматизация — только после подтверждения официального метода
+   публикации; browser automation и обход правил платформы запрещены навсегда.
+8. **Вторая вертикаль** — агрономические удобрения (СФО/УрФО): новый seed-файл и
+   верифицированные документы производителей; схема уже вертикаль-нейтральна.
+
+### Как продолжить после перерыва
+
+1. `git pull` — рабочее дерево в `main` чистое, весь прогресс в истории коммитов
+   (юниты 4a–4f — отдельными коммитами).
+2. Прочитать [AGENTS.md](AGENTS.md), [CHECKLIST.md](CHECKLIST.md) и этот раздел.
+3. Поднять окружение: `bun install`, `cp backend/.env.example backend/.env` (в нём уже
+   задан локальный `JWT_SECRET`; если `bun run api` откажется стартовать — обновить
+   его любым значением длиной ≥ 32), `bun run db:start`, `bun run db:seed`,
+   `bun run create:admin` (с `CREATE_ADMIN_EMAIL`/`CREATE_ADMIN_PASSWORD`).
+4. Прогнать цепочку валидации: `bun run check`, `bun run test`, `bun run typecheck`,
+   `bun run build`, `bun run test:integration` (нужен Docker), `bun run e2e:webapp`
+   (нужен Docker и Playwright: `bunx --cwd webapp playwright install chromium`).
+5. Продолжать со следующего шага из списка выше; любые изменения — по протоколу
+   [docs/WAVE_4_DELEGATION.md](docs/WAVE_4_DELEGATION.md) (проверки зелёные до передачи).
 
 ---
 
