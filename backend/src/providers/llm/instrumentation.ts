@@ -14,13 +14,19 @@
 
 import { createHash } from 'node:crypto'
 import type { Db } from '../../db'
-import type { LlmPort } from './port'
+import type { GenerateBriefInput, GenerateBriefOutput, GenerateDraftInput, GenerateDraftOutput, LlmPort, LlmResult } from './port'
 
 export class LlmBudgetExceededError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'LlmBudgetExceededError'
   }
+}
+
+/** An instrumented port returns the llm_runs row id alongside the provider result. */
+export interface InstrumentedLlmPort extends LlmPort {
+  generateBrief(input: GenerateBriefInput): Promise<LlmResult<GenerateBriefOutput> & { runId: string }>
+  generateDraft(input: GenerateDraftInput): Promise<LlmResult<GenerateDraftOutput> & { runId: string }>
 }
 
 export interface InstrumentationOptions {
@@ -43,7 +49,7 @@ export function hashPrompt(prompt: string): string {
   return createHash('sha256').update(prompt).digest('hex')
 }
 
-export function createInstrumentedLlmPort(inner: LlmPort, options: InstrumentationOptions): LlmPort {
+export function createInstrumentedLlmPort(inner: LlmPort, options: InstrumentationOptions): InstrumentedLlmPort {
   const { db, provider, model, monthlyCapMinorUnits, workspaceSlug } = options
 
   let workspaceIdPromise: Promise<string> | null = null
@@ -73,8 +79,8 @@ export function createInstrumentedLlmPort(inner: LlmPort, options: Instrumentati
     costCurrency: string | null
     latencyMs: number | null
     errorCode: string | null
-  }): Promise<void> => {
-    await db.llmRun.create({
+  }): Promise<{ id: string }> => {
+    const row = await db.llmRun.create({
       data: {
         workspaceId: await workspaceId(),
         provider,
@@ -90,13 +96,14 @@ export function createInstrumentedLlmPort(inner: LlmPort, options: Instrumentati
         errorCode: input.errorCode,
       },
     })
+    return { id: row.id }
   }
 
   const run = async <T>(
     purpose: Purpose,
     prompt: string,
     execute: () => Promise<{ content: T; usage: { inputTokens: number; outputTokens: number; costMinorUnits: number | null; costCurrency: string | null } }>,
-  ): Promise<{ content: T; usage: { inputTokens: number; outputTokens: number; costMinorUnits: number | null; costCurrency: string | null } }> => {
+  ): Promise<{ content: T; usage: { inputTokens: number; outputTokens: number; costMinorUnits: number | null; costCurrency: string | null }; runId: string }> => {
     if (monthlyCapMinorUnits !== null && (await spendThisMonth()) >= monthlyCapMinorUnits) {
       await record({
         purpose,
@@ -117,7 +124,7 @@ export function createInstrumentedLlmPort(inner: LlmPort, options: Instrumentati
     const started = Date.now()
     try {
       const result = await execute()
-      await record({
+      const row = await record({
         purpose,
         prompt,
         status: 'succeeded',
@@ -128,7 +135,7 @@ export function createInstrumentedLlmPort(inner: LlmPort, options: Instrumentati
         latencyMs: Date.now() - started,
         errorCode: null,
       })
-      return result
+      return { ...result, runId: row.id }
     } catch (error) {
       const timedOut = error instanceof Error && error.name === 'TimeoutError'
       await record({

@@ -47,6 +47,18 @@ describe('the wired application route table', () => {
       '/health/ready',
       '/api/users',
       '/api/users/me',
+      '/api/service-requests',
+      '/api/service-requests/:id',
+      '/api/approvals/state',
+      '/api/research/keywords',
+      '/api/research/clusters',
+      '/api/content/briefs',
+      '/api/content/items',
+      '/api/content/items/:id',
+      '/api/publications',
+      '/api/leads',
+      '/api/attribution/leads/:id/attribution',
+      '/api/analytics/funnel',
     ])
 
     const getPaths = routePairs(runtime.app)

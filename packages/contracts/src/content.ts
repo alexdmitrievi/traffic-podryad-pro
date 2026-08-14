@@ -46,7 +46,11 @@ export const contentBriefSchema = z.object({
   workspaceId: workspaceIdSchema,
   clusterId: idSchema,
   title: shortTextSchema,
-  outline: z.array(briefOutlineSectionSchema).min(1).max(50),
+  /**
+   * Empty while the brief awaits generation in the outbox; the human review gate only
+   * opens once the outline exists.
+   */
+  outline: z.array(briefOutlineSectionSchema).max(50),
   targetKeywordIds: z.array(idSchema).max(200).default([]),
   audience: mediumTextSchema.nullable(),
   tone: shortTextSchema.nullable(),

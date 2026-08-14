@@ -3,13 +3,15 @@
 Hono API для Pipupi: `api.pipupi.ru`. Модульный монолит — границы модулей описаны в
 [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
 
-**Состояние: Wave 4a–4c — рантайм, авторизация и порты провайдеров.** Работают:
-валидация окружения с fail-fast по комплаенс-предохранителям, health-маршруты, durable
-outbox с fencing-токенами, реестр периодических задач, три точки входа (`api`, `worker`,
-`cron`), вход/ротация/выход с host-only cookie, роли с немедленным действием, защита
-«ноль администраторов» и порты `LlmPort` (fake-драйвер, PII-guard, учёт `llm_runs`,
-стоимостный кап), `KeywordSourcePort` (CSV, отказ целиком) и `PublishingPort`
-(идемпотентная публикация). Продуктовые модули и поверхности — следующие юниты (4d–4f).
+**Состояние: Wave 4a–4d — рантайм, авторизация, порты провайдеров и продуктовые
+модули.** Работают: валидация окружения с fail-fast по комплаенс-предохранителям,
+health-маршруты, durable outbox с fencing-токенами, вход/ротация/выход с host-only
+cookie и ролями, порты `LlmPort` (fake-драйвер, PII-guard, учёт `llm_runs`,
+стоимостный кап), `KeywordSourcePort` (CSV, отказ целиком), `PublishingPort`
+(идемпотентность) и сквозной конвейер: заявки по четырём линиям с журналом событий,
+планы с одобрением по хэшу, импорт ключей и лексическая кластеризация, брифы и
+черновики через outbox, публикация только по одобрению, лиды с согласием и
+атрибуцией, воронка. Остались поверхности (`website`, `webapp`) и E2E — юниты 4e–4f.
 
 | Волна | Что появилось |
 | --- | --- |
@@ -17,7 +19,8 @@ outbox с fencing-токенами, реестр периодических за
 | Wave 4a | `src/env.ts`, `src/db.ts`, `src/app.ts` (health), `src/outbox/**`, `src/jobs.ts`, `src/scheduler.ts`, `src/background-tasks.ts`, точки входа, первая миграция |
 | Wave 4b | `src/modules/auth/**`, `src/modules/users/**`, CORS и Origin-проверки, rate limit, `create-admin` |
 | Wave 4c | `src/providers/llm/**` (fake + DeepSeek, PII-guard, instrumentation, cost cap), `src/providers/keywords/**` (CSV), `src/providers/publishing/**` (fake + filesystem), контрактные сьюты |
-| Wave 4d–4f | продуктовые модули, поверхности и E2E |
+| Wave 4d | `src/modules/service-requests/**`, `research/**`, `content/**`, `approvals/**`, `publishing/**`, `leads/**`, `attribution/**`, `analytics/**` — сквозной конвейер с одобрением по хэшу |
+| Wave 4e–4f | поверхности `website`/`webapp` и E2E |
 
 ## Команды
 

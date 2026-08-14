@@ -76,6 +76,19 @@ export const keywordImportRequestSchema = z
   })
   .strict()
 
+/**
+ * The raw CSV upload: the file goes through the KeywordSourcePort, which parses and
+ * rejects it entirely on any structural problem — the transport never touches rows that
+ * the port did not validate.
+ */
+export const keywordCsvImportSchema = z
+  .object({
+    requestId: idSchema,
+    csv: z.string().min(1).max(10_000_000),
+    provider: z.string().trim().min(1).max(64).default('csv'),
+  })
+  .strict()
+
 export const keywordImportResultSchema = z.object({
   received: z.int().min(0),
   created: z.int().min(0),

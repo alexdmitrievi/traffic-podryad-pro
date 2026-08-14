@@ -1,12 +1,11 @@
 /**
- * The composition root: wires environment, database, outbox, health app and the background
- * runners into one runtime object that every entrypoint shares (docs/ARCHITECTURE.md
- * section 1 — one code base, one image, several entry points).
+ * The composition root: wires environment, database, outbox, health app, the background
+ * runners and every product module into one runtime object that all entrypoints share
+ * (docs/ARCHITECTURE.md section 1 — one code base, one image, several entry points).
  *
- * The task handler registry is empty in unit 4a on purpose: no product task exists yet.
- * Brief generation, draft generation and publication arrive in units 4c/4d and register
- * themselves here. The worker is still real — a claimed task with no handler fails with
- * a visible error and eventually goes dead, never silently dropped.
+ * The task handler registry here is what the worker drains: brief generation, draft
+ * generation and publication travel through the durable outbox, and the handlers come
+ * from the modules that own them.
  */
 
 import { createApp } from './app'
@@ -15,6 +14,16 @@ import type { Env } from './env'
 import { jobs } from './jobs'
 import { createAuthModule, createSessionCleanup } from './modules/auth'
 import { createUsersModule } from './modules/users'
+import { createServiceRequestsModule } from './modules/service-requests'
+import { createApprovalsModule } from './modules/approvals'
+import type { SubjectHashProvider } from './modules/approvals'
+import { createResearchModule } from './modules/research'
+import { createContentModule } from './modules/content'
+import { createPublishingModule } from './modules/publishing'
+import { createLeadsModule } from './modules/leads'
+import { createAttributionModule } from './modules/attribution'
+import { createAnalyticsModule } from './modules/analytics'
+import { createRateLimiter } from './http/rate-limiter'
 import { createDrainLoop, drainOnce } from './outbox/drain-loop'
 import type { DrainLoop, TaskHandlerRegistry } from './outbox/drain-loop'
 import { createOutbox } from './outbox/outbox-service'
@@ -43,6 +52,8 @@ export interface Runtime {
   publishing: PublishingPort
   drainLoop: DrainLoop
   scheduler: Scheduler
+  /** Drains the outbox once with the wired task handlers. */
+  drainOutboxOnce(): Promise<number>
   /** Runs every registered periodic job once and returns. The cron entrypoint. */
   runJobsOnce(): Promise<void>
   close(): Promise<void>
@@ -111,16 +122,52 @@ export function createRuntime(env: Env): Runtime {
       trustedProxyIpHeader: env.trustedProxyClientIpHeader,
     },
   })
+  const authPick = { requireAuth: auth.requireAuth, requireRole: auth.requireRole }
 
-  const users = createUsersModule({
-    db,
-    auth: { requireAuth: auth.requireAuth, requireRole: auth.requireRole },
-  })
+  const users = createUsersModule({ db, auth: authPick })
+
+  const content = createContentModule({ db, llm, outbox, auth: authPick })
+  const publishingModule = createPublishingModule({ db, outbox, publishing, auth: authPick })
+
+  const subjectHashProviders: SubjectHashProvider = {
+    content_revision: content.revisionHash,
+    service_request_plan: async (planId) => {
+      const plan = await db.serviceRequestPlan.findUnique({ where: { id: planId } })
+      return plan?.contentHash ?? null
+    },
+  }
+  const approvals = createApprovalsModule({ db, hashProvider: subjectHashProviders, auth: authPick })
+  const approvalsDeps = { db, hashProvider: subjectHashProviders }
+
+  const serviceRequests = createServiceRequestsModule({ db, approvals: approvalsDeps, auth: authPick })
+  const research = createResearchModule({ db, keywordSource, auth: authPick })
+
+  const publicRateLimit = createRateLimiter({
+    max: env.authRateLimitMax,
+    windowMs: env.authRateLimitWindowSeconds * 1000,
+    trustedProxyIpHeader: env.trustedProxyClientIpHeader,
+  }).middleware
+  const leads = createLeadsModule({ db, rateLimit: publicRateLimit, auth: authPick })
+  const attribution = createAttributionModule({ db, rateLimit: publicRateLimit, auth: authPick })
+  const analytics = createAnalyticsModule({ db, auth: authPick })
 
   app.route('/api/auth', auth.routes)
   app.route('/api/users', users.routes)
+  app.route('/api/service-requests', serviceRequests.routes)
+  app.route('/api/approvals', approvals.routes)
+  app.route('/api/research', research.routes)
+  app.route('/api/content', content.routes)
+  app.route('/api', publishingModule.routes)
+  app.route('/api', leads.routes)
+  app.route('/api/public', leads.publicRoutes)
+  app.route('/api/attribution', attribution.routes)
+  app.route('/api/public', attribution.publicRoutes)
+  app.route('/api/analytics', analytics.routes)
 
-  const taskHandlers: TaskHandlerRegistry = {}
+  const taskHandlers: TaskHandlerRegistry = {
+    ...content.taskHandlers,
+    ...publishingModule.taskHandlers,
+  }
   const drainDeps = { outbox, handlers: taskHandlers }
 
   const jobHandlers: JobHandlerRegistry = {
@@ -140,6 +187,7 @@ export function createRuntime(env: Env): Runtime {
     publishing,
     drainLoop: createDrainLoop(drainDeps),
     scheduler: createScheduler({ jobs, handlers: jobHandlers }),
+    drainOutboxOnce: () => drainOnce(drainDeps),
     runJobsOnce: async () => {
       for (const job of jobs) {
         await jobHandlers[job.name]()

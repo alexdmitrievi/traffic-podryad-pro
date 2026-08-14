@@ -14,11 +14,8 @@
 
 import type {
   GenerateBriefInput,
-  GenerateBriefOutput,
   GenerateDraftInput,
-  GenerateDraftOutput,
   LlmPort,
-  LlmResult,
 } from './port'
 
 export class LlmGuardError extends Error {
@@ -61,7 +58,7 @@ export function findPii(input: GenerateBriefInput | GenerateDraftInput): string[
     .map((entry) => entry.id)
 }
 
-export function createGuardedLlmPort(inner: LlmPort): LlmPort {
+export function createGuardedLlmPort<T extends LlmPort>(inner: T): T {
   const guard = (input: GenerateBriefInput | GenerateDraftInput): void => {
     const patterns = findPii(input)
     if (patterns.length > 0) {
@@ -72,14 +69,16 @@ export function createGuardedLlmPort(inner: LlmPort): LlmPort {
     }
   }
 
+  // The cast preserves the inner port's exact result type (an instrumented port carries
+  // the llm_runs id); the wrapper only adds the refusal check and changes no shape.
   return {
-    async generateBrief(input: GenerateBriefInput): Promise<LlmResult<GenerateBriefOutput>> {
+    async generateBrief(input: GenerateBriefInput) {
       guard(input)
       return inner.generateBrief(input)
     },
-    async generateDraft(input: GenerateDraftInput): Promise<LlmResult<GenerateDraftOutput>> {
+    async generateDraft(input: GenerateDraftInput) {
       guard(input)
       return inner.generateDraft(input)
     },
-  }
+  } as T
 }

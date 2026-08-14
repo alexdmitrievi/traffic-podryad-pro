@@ -23,3 +23,31 @@ export function createTestDb(): Db {
 export async function clearOutbox(db: Db): Promise<void> {
   await db.$executeRawUnsafe('DELETE FROM task_outbox')
 }
+
+/**
+ * Wipes every product row in FK-safe order, then all users and sessions. Used by suites
+ * that create product data so a later suite can delete its own users without tripping
+ * RESTRICT foreign keys.
+ */
+export async function wipeDatabase(db: Db): Promise<void> {
+  await db.$transaction(async (tx) => {
+    await tx.attributionTouch.deleteMany()
+    await tx.lead.deleteMany()
+    await tx.publication.deleteMany()
+    await tx.approval.deleteMany()
+    await tx.contentRevision.deleteMany()
+    await tx.contentItem.deleteMany()
+    await tx.contentBrief.deleteMany()
+    await tx.clusterKeyword.deleteMany()
+    await tx.topicCluster.deleteMany()
+    await tx.keywordMetric.deleteMany()
+    await tx.keyword.deleteMany()
+    await tx.serviceRequestPlan.deleteMany()
+    await tx.serviceRequestEvent.deleteMany()
+    await tx.serviceRequest.deleteMany()
+    await tx.llmRun.deleteMany()
+    await tx.taskOutbox.deleteMany()
+    await tx.authSession.deleteMany()
+    await tx.user.deleteMany()
+  })
+}

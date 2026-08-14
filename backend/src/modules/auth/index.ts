@@ -18,8 +18,8 @@ import { createUserStore } from './infrastructure/user-store'
 import type { CookieSettings } from './transport/cookie'
 import { createRequireAuth, createRequireRole } from './transport/middleware'
 import type { AuthMiddleware } from './transport/middleware'
-import { createRateLimiter } from './transport/rate-limiter'
-import type { RateLimitSettings } from './transport/rate-limiter'
+import { createRateLimiter } from '../../http/rate-limiter'
+import type { RateLimitSettings } from '../../http/rate-limiter'
 import { createAuthRoutes } from './transport/routes'
 
 export interface AuthModuleDeps {

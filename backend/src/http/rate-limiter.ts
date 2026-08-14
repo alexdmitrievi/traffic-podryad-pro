@@ -1,10 +1,11 @@
 /**
- * A fixed-window in-memory rate limiter for the auth routes.
+ * A fixed-window in-memory rate limiter (docs/DOMAINS.md section 4.1, docs/COMPLIANCE.md).
  *
  * One process in the MVP, so an in-memory counter is the right first answer — a shared
  * store is infrastructure the measured need for which does not exist yet
  * (docs/ARCHITECTURE.md section 6). The key is the client IP, read through the trusted
  * proxy header so the limits hold behind the CDN, not against the proxy's own address.
+ * Shared by the auth routes and the public lead-capture routes.
  */
 
 import type { MiddlewareHandler } from 'hono'

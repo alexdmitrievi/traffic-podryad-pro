@@ -82,8 +82,10 @@ describe('auth', () => {
     runtime = createRuntime(env)
 
     const passwords = createPasswordService()
-    await db.user.create({
-      data: {
+    await db.user.upsert({
+      where: { email: admin.email },
+      update: { role: 'admin' },
+      create: {
         email: admin.email,
         passwordHash: await passwords.hash(admin.password),
         role: 'admin',
@@ -92,13 +94,49 @@ describe('auth', () => {
   })
 
   beforeEach(async () => {
-    await db.authSession.deleteMany()
-    await db.user.deleteMany({ where: { email: { not: admin.email } } })
+    // Product rows from other suites reference their users; wipe them first so deleting
+    // the users of this suite cannot trip RESTRICT foreign keys.
+    await db.$transaction(async (tx) => {
+      await tx.attributionTouch.deleteMany()
+      await tx.lead.deleteMany()
+      await tx.publication.deleteMany()
+      await tx.approval.deleteMany()
+      await tx.contentRevision.deleteMany()
+      await tx.contentItem.deleteMany()
+      await tx.contentBrief.deleteMany()
+      await tx.clusterKeyword.deleteMany()
+      await tx.topicCluster.deleteMany()
+      await tx.keywordMetric.deleteMany()
+      await tx.keyword.deleteMany()
+      await tx.serviceRequestPlan.deleteMany()
+      await tx.serviceRequestEvent.deleteMany()
+      await tx.serviceRequest.deleteMany()
+      await tx.llmRun.deleteMany()
+      await tx.authSession.deleteMany()
+      await tx.user.deleteMany({ where: { email: { not: admin.email } } })
+    })
   })
 
   afterAll(async () => {
-    await db.authSession.deleteMany()
-    await db.user.deleteMany()
+    await db.$transaction(async (tx) => {
+      await tx.attributionTouch.deleteMany()
+      await tx.lead.deleteMany()
+      await tx.publication.deleteMany()
+      await tx.approval.deleteMany()
+      await tx.contentRevision.deleteMany()
+      await tx.contentItem.deleteMany()
+      await tx.contentBrief.deleteMany()
+      await tx.clusterKeyword.deleteMany()
+      await tx.topicCluster.deleteMany()
+      await tx.keywordMetric.deleteMany()
+      await tx.keyword.deleteMany()
+      await tx.serviceRequestPlan.deleteMany()
+      await tx.serviceRequestEvent.deleteMany()
+      await tx.serviceRequest.deleteMany()
+      await tx.llmRun.deleteMany()
+      await tx.authSession.deleteMany()
+      await tx.user.deleteMany()
+    })
     await runtime.close()
     await db.$disconnect()
   })
