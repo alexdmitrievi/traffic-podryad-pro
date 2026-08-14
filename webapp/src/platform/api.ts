@@ -98,6 +98,15 @@ export async function login(email: string, password: string): Promise<void> {
   accessToken = body.accessToken
 }
 
+/**
+ * On a page load the access token is gone (it lives in memory only), but the refresh
+ * cookie survives — one silent refresh restores the session without a login screen.
+ */
+export async function bootstrapSession(): Promise<boolean> {
+  if (accessToken) return true
+  return refresh()
+}
+
 export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' })
   accessToken = null

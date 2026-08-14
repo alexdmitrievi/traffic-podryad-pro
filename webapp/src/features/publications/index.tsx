@@ -2,7 +2,7 @@
  * Publications and the lead funnel (docs/ATTRIBUTION.md section 7).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../platform/api'
 import { Alert, Button, Card, EmptyState, Table } from '../../components/ui'
 
@@ -29,23 +29,31 @@ export function PublicationsPage() {
   const [items, setItems] = useState<ItemRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const loadSeq = useRef(0)
 
   const load = async () => {
+    const seq = ++loadSeq.current
     try {
       const [publicationBody, itemBody] = await Promise.all([
         api<{ publications: PublicationRow[] }>('GET', '/api/publications'),
         api<{ items: ItemRow[] }>('GET', '/api/content/items'),
       ])
+      if (seq !== loadSeq.current) return
       setPublications(publicationBody.publications)
       setItems(itemBody.items)
-      setError(null)
+      // An error from a user action (a refused publication) stays visible until the
+      // next attempt; the background poll must not wipe it two seconds later.
     } catch (caught) {
+      if (seq !== loadSeq.current) return
       setError(caught instanceof Error ? caught.message : 'Ошибка загрузки')
     }
   }
 
   useEffect(() => {
     void load()
+    // The publication task runs in the worker; a light poll reflects its progress.
+    const interval = setInterval(() => void load(), 2_000)
+    return () => clearInterval(interval)
   }, [])
 
   const publish = async (item: ItemRow) => {
@@ -60,12 +68,19 @@ export function PublicationsPage() {
       setNotice(`Публикация создана: ${created.id}`)
       await load()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Публикация отклонена')
+      const message = caught instanceof Error ? caught.message : 'Публикация отклонена'
+      setError(message)
+      await load()
     }
   }
 
   return (
     <div>
+      <div className="toolbar">
+        <Button onClick={() => void load()} data-testid="publications-refresh">
+          Обновить
+        </Button>
+      </div>
       {notice ? <Alert kind="ok">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 

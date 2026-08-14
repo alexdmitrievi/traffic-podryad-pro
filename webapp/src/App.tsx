@@ -6,7 +6,7 @@ import { ResearchPage } from './features/research'
 import { ContentPage } from './features/content'
 import { FunnelPage, LeadsPage, PublicationsPage } from './features/publications'
 import { Button } from './components/ui'
-import { api } from './platform/api'
+import { api, bootstrapSession } from './platform/api'
 import './styles.css'
 
 function Shell({ onLogout }: { onLogout: () => void }) {
@@ -104,7 +104,14 @@ function RequestPicker({ onPick }: { onPick: (id: string | null) => void }) {
 
 export default function App() {
   const [authed, setAuthed] = useState(useAuthed())
+  const [ready, setReady] = useState(useAuthed())
   const [me, setMe] = useState<{ email: string } | null>(null)
+
+  useEffect(() => {
+    void bootstrapSession()
+      .then((ok) => setAuthed(ok))
+      .finally(() => setReady(true))
+  }, [])
 
   const onLogin = () => {
     setAuthed(true)
@@ -116,6 +123,8 @@ export default function App() {
     setAuthed(false)
     setMe(null)
   }
+
+  if (!ready) return null
 
   if (!authed) {
     return (

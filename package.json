@@ -21,6 +21,7 @@
     "test:scripts": "bun test scripts/",
     "test:backend:unit": "bun run --cwd backend test",
     "test:integration": "bun run --cwd backend test:integration",
+    "e2e:webapp": "bun run --cwd webapp e2e",
     "typecheck": "bun run --filter '*' --sequential typecheck",
     "build": "bun run --filter '*' --sequential build",
     "db:start": "docker compose --env-file backend/.env up -d postgres",

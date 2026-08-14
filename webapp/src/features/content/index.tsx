@@ -3,7 +3,7 @@
  * (docs/CONTENT_PIPELINE.md steps 7–15).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../platform/api'
 import { Alert, Button, Card, EmptyState, Field, Table } from '../../components/ui'
 
@@ -44,8 +44,12 @@ export function ContentPage({ requestId }: { requestId: string | null }) {
   const [editing, setEditing] = useState<{ item: ItemRow; body: string; metaTitle: string; metaDescription: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Out-of-order protection: a slower, stale response must not overwrite a fresher one
+  // when refreshes overlap (a busy user or a test clicking repeatedly).
+  const loadSeq = useRef(0)
 
   const load = async () => {
+    const seq = ++loadSeq.current
     try {
       const query = requestId ? `?requestId=${requestId}` : ''
       const [briefBody, itemBody, clusterBody] = await Promise.all([
@@ -53,17 +57,23 @@ export function ContentPage({ requestId }: { requestId: string | null }) {
         api<{ items: ItemRow[] }>('GET', '/api/content/items'),
         api<{ clusters: Array<{ id: string; title: string }> }>('GET', `/api/research/clusters${query}`),
       ])
+      if (seq !== loadSeq.current) return
       setBriefs(briefBody.briefs)
       setItems(itemBody.items)
       setClusters(clusterBody.clusters)
       setError(null)
     } catch (caught) {
+      if (seq !== loadSeq.current) return
       setError(caught instanceof Error ? caught.message : 'Ошибка загрузки')
     }
   }
 
   useEffect(() => {
     void load()
+    // The outbox worker advances briefs and drafts asynchronously; a light poll keeps
+    // the pipeline screen honest without anyone pressing refresh.
+    const interval = setInterval(() => void load(), 2_000)
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId])
 
@@ -128,6 +138,11 @@ export function ContentPage({ requestId }: { requestId: string | null }) {
 
   return (
     <div>
+      <div className="toolbar">
+        <Button onClick={() => void load()} data-testid="content-refresh">
+          Обновить
+        </Button>
+      </div>
       {notice ? <Alert kind="ok">{notice}</Alert> : null}
       {error ? <Alert kind="error">{error}</Alert> : null}
 
