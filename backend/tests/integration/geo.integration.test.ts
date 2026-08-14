@@ -9,11 +9,13 @@ import type { Db } from '../../src/db'
 import { applySeed, loadSeedData } from '../../prisma/seed/index.mjs'
 
 /**
- * The GEO query inventory against a real database (GEO wave, unit 2; docs/GEO.md):
+ * The GEO query inventory against a real database (GEO wave, units 2–3; docs/GEO.md):
  *
  *   - a question is recorded and triaged along the lifecycle open → planned → answered;
  *   - a dismissal is terminal, possible at every triage point, and requires a reason;
  *   - answered and dismissed are frozen: no further transition exists;
+ *   - visibility snapshots are append-only captures for open and planned questions;
+ *     frozen questions take no new snapshots, and the series over time is preserved;
  *   - roles: readers see the inventory, only admins and editors record and triage.
  */
 
@@ -114,6 +116,7 @@ describe('the GEO query inventory', () => {
 
   beforeEach(async () => {
     await db.$transaction(async (tx) => {
+      await tx.geoVisibilitySnapshot.deleteMany()
       await tx.geoQuery.deleteMany()
       await tx.authSession.deleteMany()
     })
@@ -123,6 +126,7 @@ describe('the GEO query inventory', () => {
 
   afterAll(async () => {
     await db.$transaction(async (tx) => {
+      await tx.geoVisibilitySnapshot.deleteMany()
       await tx.geoQuery.deleteMany()
       await tx.authSession.deleteMany()
       await tx.user.deleteMany()
@@ -198,6 +202,59 @@ describe('the GEO query inventory', () => {
     const read = api(viewerToken)
     expect((await read('GET', '/api/geo/queries')).status).toBe(200)
     expect((await read('POST', '/api/geo/queries', { question: 'Чужой вопрос' })).status).toBe(403)
+  })
+
+  test('snapshots are append-only captures for open and planned questions', async () => {
+    const call = api(accessToken)
+    const queryId = await createQuery(call, 'Снимки: кто возит топливо в Тюмень?')
+
+    const first = await call('POST', `/api/geo/queries/${queryId}/snapshots`, {
+      searchEngine: 'yandex',
+      brandMentioned: false,
+      answerExcerpt: 'Упоминаний бренда нет.',
+    })
+    expect(first.status).toBe(201)
+
+    await call('PATCH', `/api/geo/queries/${queryId}`, { status: 'planned' })
+    const second = await call('POST', `/api/geo/queries/${queryId}/snapshots`, {
+      searchEngine: 'perplexity',
+      brandMentioned: true,
+      mentionPosition: 2,
+      answerExcerpt: 'Pipupi упомянут вторым.',
+    })
+    expect(second.status).toBe(201)
+
+    const listed = await bodyOf<{
+      snapshots: Array<{ searchEngine: string; brandMentioned: boolean; mentionPosition: number | null }>
+    }>(await call('GET', `/api/geo/queries/${queryId}/snapshots`))
+    expect(listed.snapshots).toHaveLength(2)
+    expect(listed.snapshots[0]?.searchEngine).toBe('perplexity')
+    expect(listed.snapshots[0]?.mentionPosition).toBe(2)
+    expect(listed.snapshots[1]?.brandMentioned).toBe(false)
+    expect(listed.snapshots[1]?.mentionPosition).toBeNull()
+  })
+
+  test('a frozen question takes no new snapshots', async () => {
+    const call = api(accessToken)
+    const queryId = await createQuery(call, 'Снимки замороженного вопроса.')
+    await call('PATCH', `/api/geo/queries/${queryId}`, { status: 'planned' })
+    await call('PATCH', `/api/geo/queries/${queryId}`, { status: 'answered' })
+
+    const capture = await call('POST', `/api/geo/queries/${queryId}/snapshots`, {
+      searchEngine: 'yandex',
+      brandMentioned: false,
+    })
+    expect(capture.status).toBe(409)
+    expect((await bodyOf<{ error: { code: string } }>(capture)).error.code).toBe('GEO_QUERY_FROZEN')
+  })
+
+  test('a snapshot for a missing query is refused', async () => {
+    const call = api(accessToken)
+    const capture = await call('POST', '/api/geo/queries/0192f1a0-0000-7000-8000-000000000098/snapshots', {
+      searchEngine: 'yandex',
+      brandMentioned: false,
+    })
+    expect(capture.status).toBe(404)
   })
 
   test('anonymous access is refused', async () => {

@@ -65,6 +65,7 @@ model Workspace {
   claims            Claim[]
   citations         Citation[]
   geoQueries        GeoQuery[]
+  geoSnapshots      GeoVisibilitySnapshot[]
 
   @@map("workspaces")
 }
@@ -995,9 +996,40 @@ model GeoQuery {
   product   Product?       @relation(fields: [productId], references: [id], onDelete: SetNull, map: "geo_queries_product_id_fkey")
   region    Region?        @relation(fields: [regionId], references: [id], onDelete: SetNull, map: "geo_queries_region_id_fkey")
 
+  snapshots GeoVisibilitySnapshot[]
+
   @@index([workspaceId, status], map: "geo_queries_workspace_id_status_idx")
   @@index([workspaceId, clusterId], map: "geo_queries_workspace_id_cluster_id_idx")
   @@map("geo_queries")
+}
+
+/// A manual record of what a person saw in a real search or assistant interface for a
+/// GEO query. Append-only: every capture is a new row, so the series over time is the
+/// visibility signal. Nothing here is scraped or automated — the snapshot is taken by
+/// hand, in the interface itself, against the real question.
+model GeoVisibilitySnapshot {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  workspaceId  String   @map("workspace_id") @db.Uuid
+  queryId      String   @map("query_id") @db.Uuid
+  /// Open set: the interfaces differ and new ones appear. Validated in code.
+  searchEngine String   @map("search_engine")
+  /// What exactly was typed; defaults to the query text when not provided.
+  searchPhrase String?  @map("search_phrase")
+  /// Did the brand appear in the answer at all.
+  brandMentioned Boolean @map("brand_mentioned")
+  /// 1-based position of the first brand mention within the answer, when present.
+  mentionPosition Int?  @map("mention_position")
+  /// The answering formulation, as seen — enough for a human to compare later.
+  answerExcerpt  String? @map("answer_excerpt")
+  capturedAt     DateTime @default(now()) @map("captured_at")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "geo_visibility_snapshots_workspace_id_fkey")
+  query     GeoQuery  @relation(fields: [queryId], references: [id], onDelete: Cascade, map: "geo_visibility_snapshots_query_id_fkey")
+
+  @@index([queryId, capturedAt], map: "geo_visibility_snapshots_query_id_captured_at_idx")
+  @@map("geo_visibility_snapshots")
 }
 
 // =============================================================================

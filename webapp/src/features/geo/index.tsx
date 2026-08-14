@@ -1,9 +1,10 @@
 /**
- * GEO: вопросный инвентарь (docs/GEO.md, юнит 2).
+ * GEO: вопросный инвентарь и ручные снимки видимости (docs/GEO.md, юниты 2–3).
  *
  * Человек записывает вопросы, которые реально задают, и триажит их:
  * open → planned → answered, либо dismissed с обязательной причиной.
- * Ответные ассеты (юнит 4) строятся на planned-вопросах.
+ * Для open/planned вопросов снимаются снимки видимости вручную, в реальных
+ * интерфейсах поисковиков и ассистентов — без парсинга и автоматизации.
  */
 
 import { useEffect, useState } from 'react'
@@ -17,6 +18,18 @@ interface GeoQuery {
   priority: 'low' | 'medium' | 'high'
   status: 'open' | 'planned' | 'answered' | 'dismissed'
   statusReason: string | null
+  notes: string | null
+}
+
+interface GeoSnapshot {
+  id: string
+  queryId: string
+  searchEngine: string
+  searchPhrase: string | null
+  brandMentioned: boolean
+  mentionPosition: number | null
+  answerExcerpt: string | null
+  capturedAt: string
   notes: string | null
 }
 
@@ -39,6 +52,14 @@ export function GeoPage() {
   const [dismissingId, setDismissingId] = useState<string | null>(null)
   const [dismissReason, setDismissReason] = useState('')
 
+  const [snapshotQueryId, setSnapshotQueryId] = useState('')
+  const [snapshots, setSnapshots] = useState<GeoSnapshot[]>([])
+  const [snapEngine, setSnapEngine] = useState('yandex')
+  const [snapMentioned, setSnapMentioned] = useState(false)
+  const [snapPosition, setSnapPosition] = useState('')
+  const [snapExcerpt, setSnapExcerpt] = useState('')
+  const [snapNotes, setSnapNotes] = useState('')
+
   const load = async () => {
     try {
       const body = await api<{ queries: GeoQuery[] }>('GET', '/api/geo/queries')
@@ -46,6 +67,20 @@ export function GeoPage() {
       setError(null)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Ошибка загрузки')
+    }
+  }
+
+  const loadSnapshots = async (queryId: string) => {
+    if (!queryId) {
+      setSnapshots([])
+      return
+    }
+    try {
+      const body = await api<{ snapshots: GeoSnapshot[] }>('GET', `/api/geo/queries/${queryId}/snapshots`)
+      setSnapshots(body.snapshots)
+    } catch (caught) {
+      setSnapshots([])
+      setError(caught instanceof Error ? caught.message : 'Снимки не загрузились')
     }
   }
 
@@ -98,6 +133,34 @@ export function GeoPage() {
       setError(caught instanceof Error ? caught.message : 'Отклонение не записано')
     }
   }
+
+  const createSnapshot = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!snapshotQueryId) {
+      setError('Выберите вопрос для снимка')
+      return
+    }
+    setError(null)
+    setNotice(null)
+    try {
+      await api('POST', `/api/geo/queries/${snapshotQueryId}/snapshots`, {
+        searchEngine: snapEngine,
+        brandMentioned: snapMentioned,
+        ...(snapMentioned && snapPosition ? { mentionPosition: Number(snapPosition) } : {}),
+        ...(snapExcerpt ? { answerExcerpt: snapExcerpt } : {}),
+        ...(snapNotes ? { notes: snapNotes } : {}),
+      })
+      setNotice('Снимок записан.')
+      setSnapExcerpt('')
+      setSnapNotes('')
+      setSnapPosition('')
+      await loadSnapshots(snapshotQueryId)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Снимок не записан')
+    }
+  }
+
+  const openForSnapshots = queries.filter((entry) => entry.status === 'open' || entry.status === 'planned')
 
   return (
     <div>
@@ -205,6 +268,87 @@ export function GeoPage() {
           </form>
         </Card>
       ) : null}
+
+      <Card title="Снимки видимости">
+        <form onSubmit={createSnapshot}>
+          <Field label="Вопрос">
+            <select
+              value={snapshotQueryId}
+              onChange={(event) => {
+                setSnapshotQueryId(event.target.value)
+                void loadSnapshots(event.target.value)
+              }}
+              data-testid="snapshot-query"
+            >
+              <option value="">— выберите вопрос —</option>
+              {openForSnapshots.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.question}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Интерфейс">
+            <select value={snapEngine} onChange={(event) => setSnapEngine(event.target.value)} data-testid="snapshot-engine">
+              <option value="yandex">Яндекс Поиск</option>
+              <option value="google">Google</option>
+              <option value="chatgpt">ChatGPT</option>
+              <option value="perplexity">Perplexity</option>
+              <option value="gigachat">GigaChat</option>
+              <option value="other">Другой</option>
+            </select>
+          </Field>
+          <Field label="Бренд упомянут">
+            <input
+              type="checkbox"
+              checked={snapMentioned}
+              onChange={(event) => setSnapMentioned(event.target.checked)}
+              data-testid="snapshot-mentioned"
+            />
+          </Field>
+          {snapMentioned ? (
+            <Field label="Позиция упоминания">
+              <input
+                type="number"
+                min={1}
+                value={snapPosition}
+                onChange={(event) => setSnapPosition(event.target.value)}
+                data-testid="snapshot-position"
+              />
+            </Field>
+          ) : null}
+          <Field label="Формулировка ответа (необязательно)">
+            <textarea
+              rows={2}
+              value={snapExcerpt}
+              onChange={(event) => setSnapExcerpt(event.target.value)}
+              data-testid="snapshot-excerpt"
+            />
+          </Field>
+          <Button type="submit" data-testid="snapshot-create">
+            Записать снимок
+          </Button>
+        </form>
+
+        {snapshots.length === 0 ? (
+          <EmptyState>Снимков по выбранному вопросу нет.</EmptyState>
+        ) : (
+          <Table
+            rows={snapshots}
+            keyFor={(row) => row.id}
+            columns={[
+              { header: 'Когда', render: (row) => new Date(row.capturedAt).toLocaleString('ru-RU') },
+              { header: 'Интерфейс', render: (row) => <code>{row.searchEngine}</code> },
+              {
+                header: 'Бренд',
+                render: (row) =>
+                  row.brandMentioned ? `да, позиция ${row.mentionPosition ?? '—'}` : 'нет',
+              },
+              { header: 'Ответ', render: (row) => row.answerExcerpt ?? '—' },
+            ]}
+          />
+        )}
+      </Card>
     </div>
   )
 }

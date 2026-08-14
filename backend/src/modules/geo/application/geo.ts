@@ -4,9 +4,7 @@ import { transitionAllowed } from '../domain/geo'
 
 export interface GeoDeps {
   db: Db
-}
-
-export class GeoQueryNotFoundError extends Error {
+}export class GeoQueryNotFoundError extends Error {
   constructor() {
     super('geo query not found')
     this.name = 'GeoQueryNotFoundError'
@@ -132,5 +130,96 @@ export function serializeGeoQuery(query: {
     notes: query.notes,
     createdAt: query.createdAt.toISOString(),
     updatedAt: query.updatedAt.toISOString(),
+  }
+}
+
+// ── Visibility snapshots ─────────────────────────────────────────────────────
+
+export class GeoQueryFrozenError extends Error {
+  constructor() {
+    super('a dismissed or answered question takes no new snapshots')
+    this.name = 'GeoQueryFrozenError'
+  }
+}
+
+/**
+ * Append-only: every capture is a new row, so the series over time is the visibility
+ * signal. A frozen question (answered or dismissed) takes no new snapshots — the
+ * answer exists or the question is closed, and a later capture would mislead.
+ */
+export async function createVisibilitySnapshot(
+  deps: GeoDeps,
+  input: {
+    queryId: string
+    searchEngine: string
+    searchPhrase?: string
+    brandMentioned: boolean
+    mentionPosition?: number
+    answerExcerpt?: string
+    capturedAt?: string
+    notes?: string
+  },
+) {
+  const query = await deps.db.geoQuery.findUnique({ where: { id: input.queryId } })
+  if (!query) throw new GeoQueryNotFoundError()
+  if (query.status === 'answered' || query.status === 'dismissed') {
+    throw new GeoQueryFrozenError()
+  }
+
+  const snapshot = await deps.db.geoVisibilitySnapshot.create({
+    data: {
+      workspaceId: query.workspaceId,
+      queryId: query.id,
+      searchEngine: input.searchEngine,
+      searchPhrase: input.searchPhrase ?? query.question,
+      brandMentioned: input.brandMentioned,
+      mentionPosition: input.mentionPosition ?? null,
+      answerExcerpt: input.answerExcerpt ?? null,
+      capturedAt: input.capturedAt ? new Date(input.capturedAt) : new Date(),
+      notes: input.notes ?? null,
+    },
+  })
+  return serializeSnapshot(snapshot)
+}
+
+export async function listVisibilitySnapshots(
+  deps: GeoDeps,
+  input: { queryId: string },
+) {
+  const query = await deps.db.geoQuery.findUnique({ where: { id: input.queryId } })
+  if (!query) throw new GeoQueryNotFoundError()
+
+  const snapshots = await deps.db.geoVisibilitySnapshot.findMany({
+    where: { queryId: query.id },
+    orderBy: { capturedAt: 'desc' },
+  })
+  return snapshots.map(serializeSnapshot)
+}
+
+export function serializeSnapshot(snapshot: {
+  id: string
+  workspaceId: string
+  queryId: string
+  searchEngine: string
+  searchPhrase: string | null
+  brandMentioned: boolean
+  mentionPosition: number | null
+  answerExcerpt: string | null
+  capturedAt: Date
+  notes: string | null
+  createdAt: Date
+}) {
+  return {
+    id: snapshot.id,
+    workspaceId: snapshot.workspaceId,
+    queryId: snapshot.queryId,
+    searchEngine: snapshot.searchEngine,
+    searchPhrase: snapshot.searchPhrase,
+    brandMentioned: snapshot.brandMentioned,
+    mentionPosition: snapshot.mentionPosition,
+    answerExcerpt: snapshot.answerExcerpt,
+    capturedAt: snapshot.capturedAt.toISOString(),
+    notes: snapshot.notes,
+    createdAt: snapshot.createdAt.toISOString(),
   }
 }

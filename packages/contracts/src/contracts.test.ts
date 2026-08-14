@@ -774,6 +774,65 @@ describe('geo queries', () => {
   })
 })
 
+// ── geo snapshots ────────────────────────────────────────────────────────────
+
+describe('geo snapshots', () => {
+  const queryId = uuid(10)
+
+  const validSnapshot = {
+    id: uuid(11),
+    workspaceId: uuid(9),
+    queryId,
+    searchEngine: 'yandex',
+    searchPhrase: 'дизельное топливо оптом омск',
+    brandMentioned: true,
+    mentionPosition: 3,
+    answerExcerpt: 'Среди поставщиков — Pipupi.',
+    capturedAt: now,
+    notes: null,
+    createdAt: now,
+  }
+
+  test('a valid snapshot parses', () => {
+    expect(
+      contracts.geoSnapshots.geoVisibilitySnapshotSchema.safeParse(validSnapshot).success,
+    ).toBe(true)
+  })
+
+  test('a mention position with an absent mention is rejected', () => {
+    expect(
+      contracts.geoSnapshots.createGeoVisibilitySnapshotSchema.safeParse({
+        searchEngine: 'yandex',
+        brandMentioned: false,
+        mentionPosition: 2,
+      }).success,
+    ).toBe(false)
+  })
+
+  test('an engine code is a lowercase identifier, not free text', () => {
+    expect(
+      contracts.geoSnapshots.createGeoVisibilitySnapshotSchema.safeParse({
+        searchEngine: 'Яндекс',
+        brandMentioned: false,
+      }).success,
+    ).toBe(false)
+    expect(
+      contracts.geoSnapshots.createGeoVisibilitySnapshotSchema.safeParse({
+        searchEngine: 'perplexity',
+        brandMentioned: false,
+      }).success,
+    ).toBe(true)
+  })
+
+  test('a snapshot requires the brand mention flag', () => {
+    expect(
+      contracts.geoSnapshots.createGeoVisibilitySnapshotSchema.safeParse({
+        searchEngine: 'yandex',
+      }).success,
+    ).toBe(false)
+  })
+})
+
 // ── the tree itself ──────────────────────────────────────────────────────────
 
 describe('contract tree', () => {
@@ -788,6 +847,7 @@ describe('contract tree', () => {
       'errors',
       'evidence',
       'geoQueries',
+      'geoSnapshots',
       'leads',
       'llmRuns',
       'outbox',

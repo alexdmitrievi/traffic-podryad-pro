@@ -62,6 +62,7 @@ describe('the wired application route table', () => {
       '/api/evidence/sources',
       '/api/evidence/claims',
       '/api/geo/queries',
+      '/api/geo/queries/:id/snapshots',
     ])
 
     const getPaths = routePairs(runtime.app)

@@ -3,11 +3,14 @@ import { contracts } from '@traffic/contracts'
 import type { Db } from '../../../db'
 import type { AuthMiddleware } from '../../auth'
 import {
+  GeoQueryFrozenError,
   GeoQueryNotFoundError,
   GeoQueryReasonRequiredError,
   GeoQueryTransitionError,
   createGeoQuery,
+  createVisibilitySnapshot,
   listGeoQueries,
+  listVisibilitySnapshots,
   updateGeoQuery,
 } from '../application/geo'
 
@@ -69,6 +72,49 @@ export function createGeoRoutes(deps: GeoRoutesDeps): Hono {
 
     const queries = await listGeoQueries(depsFull, query.data)
     return c.json({ queries: queries.map((entry) => contracts.geoQueries.geoQuerySchema.parse(entry)) })
+  })
+
+  routes.post('/queries/:id/snapshots', deps.requireAuth, deps.requireEditor, async (c) => {
+    const id = contracts.common.idSchema.safeParse(c.req.param('id'))
+    if (!id.success) {
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } }, 400)
+    }
+    const parsed = contracts.geoSnapshots.createGeoVisibilitySnapshotSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid snapshot payload' } }, 400)
+    }
+
+    try {
+      const snapshot = await createVisibilitySnapshot(depsFull, { queryId: id.data, ...parsed.data })
+      return c.json(contracts.geoSnapshots.geoVisibilitySnapshotSchema.parse(snapshot), 201)
+    } catch (error) {
+      if (error instanceof GeoQueryNotFoundError) {
+        return c.json({ error: { code: 'NOT_FOUND', message: error.message } }, 404)
+      }
+      if (error instanceof GeoQueryFrozenError) {
+        return c.json({ error: { code: 'GEO_QUERY_FROZEN', message: error.message } }, 409)
+      }
+      throw error
+    }
+  })
+
+  routes.get('/queries/:id/snapshots', deps.requireAuth, async (c) => {
+    const id = contracts.common.idSchema.safeParse(c.req.param('id'))
+    if (!id.success) {
+      return c.json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } }, 400)
+    }
+
+    try {
+      const snapshots = await listVisibilitySnapshots(depsFull, { queryId: id.data })
+      return c.json({
+        snapshots: snapshots.map((entry) => contracts.geoSnapshots.geoVisibilitySnapshotSchema.parse(entry)),
+      })
+    } catch (error) {
+      if (error instanceof GeoQueryNotFoundError) {
+        return c.json({ error: { code: 'NOT_FOUND', message: error.message } }, 404)
+      }
+      throw error
+    }
   })
 
   return routes
