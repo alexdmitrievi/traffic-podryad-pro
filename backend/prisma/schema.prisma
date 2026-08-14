@@ -66,6 +66,7 @@ model Workspace {
   citations         Citation[]
   geoQueries        GeoQuery[]
   geoSnapshots      GeoVisibilitySnapshot[]
+  geoAnswerAssets   GeoAnswerAsset[]
 
   @@map("workspaces")
 }
@@ -706,6 +707,7 @@ enum ApprovalSubjectType {
   service_request_plan
   content_revision
   publication
+  geo_answer_asset
 
   @@map("approval_subject_type")
 }
@@ -997,10 +999,35 @@ model GeoQuery {
   region    Region?        @relation(fields: [regionId], references: [id], onDelete: SetNull, map: "geo_queries_region_id_fkey")
 
   snapshots GeoVisibilitySnapshot[]
+  answer    GeoAnswerAsset?
 
   @@index([workspaceId, status], map: "geo_queries_workspace_id_status_idx")
   @@index([workspaceId, clusterId], map: "geo_queries_workspace_id_cluster_id_idx")
   @@map("geo_queries")
+}
+
+/// The answer asset for one inventory question (GEO wave, unit 4). The body is written
+/// and fact-checked by a human; every linked claim must be a verified, non-superseded
+/// claim from the evidence registry. Approval goes through the shared approvals context
+/// with the asset's content hash — the same gate every publication passes. When the
+/// asset is approved, the question becomes answered.
+model GeoAnswerAsset {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  queryId        String   @unique(map: "geo_answer_assets_query_id_key") @map("query_id") @db.Uuid
+  bodyMarkdown   String   @map("body_markdown")
+  /// SHA-256 over the canonical body and the sorted claim ids. Editing either changes
+  /// the hash, which detaches any approval — the standard rule of this repository.
+  contentHash    String   @map("content_hash")
+  /// The claims the answer is built on; a subset of verified claims, enforced in code.
+  linkedClaimIds String[] @default([]) @map("linked_claim_ids") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "geo_answer_assets_workspace_id_fkey")
+  query     GeoQuery  @relation(fields: [queryId], references: [id], onDelete: Cascade, map: "geo_answer_assets_query_id_fkey")
+
+  @@map("geo_answer_assets")
 }
 
 /// A manual record of what a person saw in a real search or assistant interface for a

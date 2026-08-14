@@ -5,7 +5,7 @@
 Формат заимствован из Vibe Coding Template. Состояния возможностей (`available`, `included`, `removed`, `deferred`, `forbidden`) — служебные слова, на которые ссылаются другие документы и будущие проверки; их пишем на английском и не переводим.
 
 **Install status:** `in progress`
-**Wave:** 4 из 4 — сквозной SEO-срез реализован и покрыт E2E; продакшн не развёрнут. GEO-волна в работе: юниты 1–3 (реестр фактов, вопросный инвентарь, снимки видимости) реализованы
+**Wave:** 4 из 4 — сквозной SEO-срез реализован и покрыт E2E; продакшн не развёрнут. GEO-волна в работе: юниты 1–4 (реестр фактов, вопросный инвентарь, снимки видимости, ответные ассеты) реализованы
 **Дата последнего обновления:** 2026-08-14
 
 ---
@@ -90,6 +90,7 @@
 | Реестр подтверждённых фактов (evidence registry) | `included` | `EvidenceSource`/`Claim`/`Citation`, верификация человеком, supersede-коррекции. Юнит 1 GEO-волны |
 | Вопросный инвентарь GEO | `included` | `GeoQuery` с триажем open → planned → answered и отклонением с причиной. Юнит 2 GEO-волны |
 | Ручные снимки видимости GEO | `included` | `GeoVisibilitySnapshot`, append-only серии по вопросам, только для open/planned. Юнит 3 GEO-волны |
+| Ответные ассеты GEO | `included` | `GeoAnswerAsset` на верифицированных claims, одобрение через общий approvals-gate с привязкой к content hash. Юнит 4 GEO-волны |
 | Durable outbox | `included` | Из шаблона |
 | Ports и adapters | `included` | LLM, keywords, publishing, storage |
 | Загрузка медиа | `available` | Код порта есть, модуль не активируем |

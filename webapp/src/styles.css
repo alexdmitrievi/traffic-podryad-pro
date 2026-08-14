@@ -44,6 +44,14 @@ code { background: #eef1f5; padding: 0.05rem 0.35rem; border-radius: 0.25rem; fo
 .alert-info { background: #eef4ff; border: 1px solid #c7dbff; color: #1e3a8a; }
 .empty { color: var(--muted); }
 .picker { margin-bottom: 1rem; }
+.picker .btn { margin-left: 0.75rem; }
+
+.row-actions { display: flex; gap: 0.4rem; }
+
+.answer-editor { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border, #e2e2e2); }
+.answer-editor .row-actions { margin-top: 0.6rem; }
+.claim-checks { display: flex; flex-direction: column; gap: 0.35rem; }
+.claim-check { display: flex; gap: 0.5rem; align-items: flex-start; }
 
 .funnel { display: flex; gap: 2rem; }
 .funnel dt { color: var(--muted); }

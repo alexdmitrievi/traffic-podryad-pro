@@ -26,6 +26,7 @@ import * as common from './common'
 import * as content from './content'
 import * as errors from './errors'
 import * as evidence from './evidence'
+import * as geoAnswers from './geo-answers'
 import * as geoQueries from './geo-queries'
 import * as geoSnapshots from './geo-snapshots'
 import * as keywords from './keywords'
@@ -80,6 +81,9 @@ export const contracts = {
   /** Manual GEO visibility snapshots, append-only series over time. */
   geoSnapshots,
 
+  /** GEO answer assets built on verified claims, approved through the shared gate. */
+  geoAnswers,
+
   /** Model usage and its cost. */
   llmRuns,
 
@@ -97,6 +101,7 @@ export * from './common'
 export * from './content'
 export * from './errors'
 export * from './evidence'
+export * from './geo-answers'
 export * from './geo-queries'
 export * from './geo-snapshots'
 export * from './keywords'

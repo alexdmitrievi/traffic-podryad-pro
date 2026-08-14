@@ -26,6 +26,7 @@ export const approvalSubjectTypeSchema = z.enum([
   'service_request_plan',
   'content_revision',
   'publication',
+  'geo_answer_asset',
 ])
 
 export const approvalDecisionSchema = z.enum(['approved', 'rejected'])

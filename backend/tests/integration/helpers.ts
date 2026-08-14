@@ -49,6 +49,7 @@ export async function wipeDatabase(db: Db): Promise<void> {
     await tx.citation.deleteMany()
     await tx.claim.deleteMany()
     await tx.evidenceSource.deleteMany()
+    await tx.geoAnswerAsset.deleteMany()
     await tx.geoVisibilitySnapshot.deleteMany()
     await tx.geoQuery.deleteMany()
     await tx.taskOutbox.deleteMany()

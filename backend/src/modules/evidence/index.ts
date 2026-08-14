@@ -27,3 +27,5 @@ export function createEvidenceModule(deps: EvidenceModuleDeps): EvidenceModule {
 
   return { routes }
 }
+
+export { isUsableClaim } from './domain/evidence'

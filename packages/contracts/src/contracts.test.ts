@@ -833,6 +833,55 @@ describe('geo snapshots', () => {
   })
 })
 
+// ── geo answers ──────────────────────────────────────────────────────────────
+
+describe('geo answers', () => {
+  const asset = {
+    id: uuid(20),
+    workspaceId: uuid(9),
+    queryId: uuid(21),
+    bodyMarkdown: 'Ответ, проверенный человеком.',
+    contentHash: hash('a'),
+    linkedClaimIds: [uuid(22)],
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  test('a valid answer asset parses', () => {
+    expect(contracts.geoAnswers.geoAnswerSchema.safeParse(asset).success).toBe(true)
+  })
+
+  test('the content hash must be a sha-256 digest', () => {
+    expect(
+      contracts.geoAnswers.geoAnswerSchema.safeParse({ ...asset, contentHash: 'not-a-hash' })
+        .success,
+    ).toBe(false)
+  })
+
+  test('an update must change at least one field', () => {
+    expect(contracts.geoAnswers.updateGeoAnswerSchema.safeParse({}).success).toBe(false)
+    expect(
+      contracts.geoAnswers.updateGeoAnswerSchema.safeParse({ bodyMarkdown: 'Правка.' }).success,
+    ).toBe(true)
+  })
+
+  test('approval payload carries the hash and rejects unknown fields', () => {
+    expect(
+      contracts.geoAnswers.approveGeoAnswerSchema.safeParse({ contentHash: hash('a') }).success,
+    ).toBe(true)
+    expect(
+      contracts.geoAnswers.approveGeoAnswerSchema.safeParse({ contentHash: hash('a'), decision: 'approved' })
+        .success,
+    ).toBe(false)
+  })
+
+  test('the shared approval gate knows the geo answer subject', () => {
+    expect(
+      contracts.approvals.approvalSubjectTypeSchema.safeParse('geo_answer_asset').success,
+    ).toBe(true)
+  })
+})
+
 // ── the tree itself ──────────────────────────────────────────────────────────
 
 describe('contract tree', () => {
@@ -846,6 +895,7 @@ describe('contract tree', () => {
       'content',
       'errors',
       'evidence',
+      'geoAnswers',
       'geoQueries',
       'geoSnapshots',
       'leads',

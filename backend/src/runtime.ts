@@ -142,6 +142,10 @@ export function createRuntime(env: Env): Runtime {
       const plan = await db.serviceRequestPlan.findUnique({ where: { id: planId } })
       return plan?.contentHash ?? null
     },
+    geo_answer_asset: async (assetId) => {
+      const asset = await db.geoAnswerAsset.findUnique({ where: { id: assetId } })
+      return asset?.contentHash ?? null
+    },
   }
   const approvals = createApprovalsModule({ db, hashProvider: subjectHashProviders, auth: authPick })
   const approvalsDeps = { db, hashProvider: subjectHashProviders }
@@ -158,7 +162,7 @@ export function createRuntime(env: Env): Runtime {
   const attribution = createAttributionModule({ db, rateLimit: publicRateLimit, auth: authPick })
   const analytics = createAnalyticsModule({ db, auth: authPick })
   const evidence = createEvidenceModule({ db, auth: authPick })
-  const geo = createGeoModule({ db, auth: authPick })
+  const geo = createGeoModule({ db, approvals: approvalsDeps, auth: authPick })
 
   app.route('/api/auth', auth.routes)
   app.route('/api/users', users.routes)

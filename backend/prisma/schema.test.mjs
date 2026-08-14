@@ -98,6 +98,7 @@ describe('models', () => {
       'Citation',
       'GeoQuery',
       'GeoVisibilitySnapshot',
+      'GeoAnswerAsset',
       'LlmRun',
       'AuditLog',
       'TaskOutbox',

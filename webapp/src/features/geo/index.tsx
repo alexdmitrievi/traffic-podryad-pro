@@ -1,10 +1,13 @@
 /**
- * GEO: вопросный инвентарь и ручные снимки видимости (docs/GEO.md, юниты 2–3).
+ * GEO: вопросный инвентарь, ручные снимки видимости и ответные ассеты
+ * (docs/GEO.md, юниты 2–4).
  *
  * Человек записывает вопросы, которые реально задают, и триажит их:
  * open → planned → answered, либо dismissed с обязательной причиной.
  * Для open/planned вопросов снимаются снимки видимости вручную, в реальных
  * интерфейсах поисковиков и ассистентов — без парсинга и автоматизации.
+ * Ответные ассеты строятся только на верифицированных claims и одобряются
+ * через общий gate, привязанный к content hash.
  */
 
 import { useEffect, useState } from 'react'
@@ -31,6 +34,22 @@ interface GeoSnapshot {
   answerExcerpt: string | null
   capturedAt: string
   notes: string | null
+}
+
+interface VerifiedClaim {
+  id: string
+  statement: string
+}
+
+interface GeoAnswer {
+  id: string
+  queryId: string
+  question: string
+  bodyMarkdown: string
+  contentHash: string
+  linkedClaimIds: string[]
+  isApproved: boolean
+  approvalId: string | null
 }
 
 const statusLabels: Record<GeoQuery['status'], string> = {
@@ -60,6 +79,13 @@ export function GeoPage() {
   const [snapExcerpt, setSnapExcerpt] = useState('')
   const [snapNotes, setSnapNotes] = useState('')
 
+  const [answers, setAnswers] = useState<GeoAnswer[]>([])
+  const [verifiedClaims, setVerifiedClaims] = useState<VerifiedClaim[]>([])
+  const [newAnswerQueryId, setNewAnswerQueryId] = useState('')
+  const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null)
+  const [answerBody, setAnswerBody] = useState('')
+  const [answerClaimIds, setAnswerClaimIds] = useState<string[]>([])
+
   const load = async () => {
     try {
       const body = await api<{ queries: GeoQuery[] }>('GET', '/api/geo/queries')
@@ -69,6 +95,46 @@ export function GeoPage() {
       setError(caught instanceof Error ? caught.message : 'Ошибка загрузки')
     }
   }
+
+  const loadAnswers = async () => {
+    try {
+      const body = await api<{ answers: GeoAnswer[] }>('GET', '/api/geo/answers')
+      setAnswers(body.answers)
+      setError(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Ответы не загрузились')
+    }
+  }
+
+  const loadVerifiedClaims = async () => {
+    try {
+      const body = await api<{ claims: Array<{ id: string; statement: string }> }>(
+        'GET',
+        '/api/evidence/claims?status=verified',
+      )
+      setVerifiedClaims(body.claims)
+    } catch {
+      setVerifiedClaims([])
+    }
+  }
+
+  const openAnswer = (answer: GeoAnswer) => {
+    setSelectedAnswerId(answer.id)
+    setAnswerBody(answer.bodyMarkdown)
+    setAnswerClaimIds(answer.linkedClaimIds)
+  }
+
+  useEffect(() => {
+    void load()
+    void loadAnswers()
+    void loadVerifiedClaims()
+  }, [])
+
+  const selectedAnswer = answers.find((entry) => entry.id === selectedAnswerId) ?? null
+  const plannedWithoutAnswer = queries.filter(
+    (entry) =>
+      entry.status === 'planned' && !answers.some((answer) => answer.queryId === entry.id),
+  )
 
   const loadSnapshots = async (queryId: string) => {
     if (!queryId) {
@@ -161,6 +227,70 @@ export function GeoPage() {
   }
 
   const openForSnapshots = queries.filter((entry) => entry.status === 'open' || entry.status === 'planned')
+
+  const createAnswer = async () => {
+    if (!newAnswerQueryId) {
+      setError('Выберите planned-вопрос для ответа')
+      return
+    }
+    setError(null)
+    setNotice(null)
+    try {
+      const answer = await api<GeoAnswer>('POST', `/api/geo/queries/${newAnswerQueryId}/answer`, {
+        bodyMarkdown: '',
+        linkedClaimIds: [],
+      })
+      setNotice('Ответ создан; напишите текст, привяжите факты и одобрите.')
+      setNewAnswerQueryId('')
+      await loadAnswers()
+      await load()
+      openAnswer({ ...answer, question: '', isApproved: false, approvalId: null })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Ответ не создан')
+    }
+  }
+
+  const saveAnswer = async () => {
+    if (!selectedAnswerId) return
+    setError(null)
+    setNotice(null)
+    try {
+      const saved = await api<GeoAnswer>('PATCH', `/api/geo/answers/${selectedAnswerId}`, {
+        bodyMarkdown: answerBody,
+        linkedClaimIds: answerClaimIds,
+      })
+      setNotice('Ответ сохранён; хеш обновлён.')
+      await loadAnswers()
+      openAnswer({ ...saved, question: selectedAnswer?.question ?? '', isApproved: false, approvalId: null })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Ответ не сохранён')
+    }
+  }
+
+  const approveAnswer = async () => {
+    if (!selectedAnswer) return
+    setError(null)
+    setNotice(null)
+    try {
+      // The gate compares against the hash the asset carries right now; fetch it at the
+      // moment of the decision instead of trusting a possibly stale copy in the UI state.
+      const fresh = await api<{ answers: GeoAnswer[] }>(
+        'GET',
+        `/api/geo/answers?queryId=${selectedAnswer.queryId}`,
+      )
+      const current = fresh.answers[0]
+      if (!current) throw new Error('Ответ не найден')
+
+      await api('POST', `/api/geo/answers/${selectedAnswer.id}/approve`, {
+        contentHash: current.contentHash,
+      })
+      setNotice('Ответ одобрен; вопрос перешёл в answered.')
+      await loadAnswers()
+      await load()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Одобрение не записано')
+    }
+  }
 
   return (
     <div>
@@ -348,6 +478,101 @@ export function GeoPage() {
             ]}
           />
         )}
+      </Card>
+
+      <Card title="Ответные ассеты">
+        <div className="picker">
+          <label>
+            Planned-вопрос:{' '}
+            <select
+              value={newAnswerQueryId}
+              onChange={(event) => setNewAnswerQueryId(event.target.value)}
+              data-testid="answer-create-query"
+            >
+              <option value="">— выберите вопрос —</option>
+              {plannedWithoutAnswer.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.question}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button onClick={createAnswer} data-testid="answer-create">
+            Создать ответ
+          </Button>
+        </div>
+
+        {answers.length === 0 ? (
+          <EmptyState>Ответных ассетов пока нет.</EmptyState>
+        ) : (
+          <Table
+            rows={answers}
+            keyFor={(row) => row.id}
+            columns={[
+              { header: 'Вопрос', render: (row) => row.question },
+              {
+                header: 'Статус',
+                render: (row) => (
+                  <code data-testid={`answer-status-${row.id}`}>
+                    {row.isApproved ? 'approved' : 'draft'}
+                  </code>
+                ),
+              },
+              {
+                header: 'Действия',
+                render: (row) => (
+                  <Button onClick={() => openAnswer(row)} data-testid={`answer-open-${row.id}`}>
+                    Открыть
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        )}
+
+        {selectedAnswer ? (
+          <div className="answer-editor">
+            <Field label="Текст ответа (проверено человеком)">
+              <textarea
+                rows={8}
+                value={answerBody}
+                onChange={(event) => setAnswerBody(event.target.value)}
+                data-testid="answer-body"
+              />
+            </Field>
+            <div className="field">
+              <span>Подтверждённые факты, на которых построен ответ</span>
+              <div className="claim-checks">
+                {verifiedClaims.map((claim) => (
+                  <label key={claim.id} className="claim-check">
+                    <input
+                      type="checkbox"
+                      checked={answerClaimIds.includes(claim.id)}
+                      onChange={(event) =>
+                        setAnswerClaimIds((current) =>
+                          event.target.checked
+                            ? [...current, claim.id]
+                            : current.filter((id) => id !== claim.id),
+                        )
+                      }
+                      data-testid={`answer-claim-${claim.id}`}
+                    />
+                    <span>{claim.statement}</span>
+                  </label>
+                ))}
+                {verifiedClaims.length === 0 ? <EmptyState>Верифицированных фактов пока нет.</EmptyState> : null}
+              </div>
+            </div>
+            <div className="row-actions">
+              <Button onClick={saveAnswer} data-testid="answer-save">
+                Сохранить
+              </Button>
+              <Button onClick={approveAnswer} disabled={selectedAnswer.isApproved} data-testid="answer-approve">
+                {selectedAnswer.isApproved ? 'Одобрен' : 'Одобрить'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Card>
     </div>
   )

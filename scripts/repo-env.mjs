@@ -48,6 +48,7 @@ export const fixtureExemptions = {
     'webapp/e2e/pipeline.spec.ts',
     'webapp/e2e/evidence.spec.ts',
     'webapp/e2e/geo.spec.ts',
+    'webapp/e2e/geo-answers.spec.ts',
   ],
   'architecture-check': ['scripts/architecture-check.test.mjs'],
 }
