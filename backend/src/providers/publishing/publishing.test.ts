@@ -16,6 +16,9 @@ describe('the fake publishing driver', () => {
       revisionId: 'b',
       slug: 'slug-a',
       html: '<p>a</p>',
+      bodyMarkdown: 'a',
+      title: 'A',
+      description: null,
     })
 
     expect(driver.calls()).toBe(1)
@@ -39,16 +42,27 @@ describe('the filesystem publishing driver', () => {
     createFilesystemPublishingDriver({ rootDirectory: directory }),
   )
 
-  test('writes the rendered html to a file named after the slug', async () => {
+  test('writes the rendered html and the site sources to files named after the slug', async () => {
     const driver = createFilesystemPublishingDriver({ rootDirectory: directory })
     await driver.publish({
       contentItemId: 'a',
       revisionId: 'b',
       slug: 'slug-fs',
       html: '<html>тело</html>',
+      bodyMarkdown: '# тело',
+      title: 'Тело',
+      description: 'Описание тела',
     })
 
     const content = await readFile(path.join(directory, 'slug-fs.html'), 'utf8')
     expect(content).toBe('<html>тело</html>')
+
+    const markdown = await readFile(path.join(directory, 'slug-fs.md'), 'utf8')
+    expect(markdown).toBe('# тело')
+
+    const meta = JSON.parse(await readFile(path.join(directory, 'slug-fs.meta.json'), 'utf8'))
+    expect(meta).toEqual(
+      expect.objectContaining({ slug: 'slug-fs', title: 'Тело', description: 'Описание тела' }),
+    )
   })
 })

@@ -10,6 +10,9 @@ const input = {
   revisionId: '0192f1a0-0000-7000-8000-000000000002',
   slug: 'dt-optom-omsk',
   html: '<html><body>Статья</body></html>',
+  bodyMarkdown: '# Статья',
+  title: 'Статья',
+  description: 'Описание',
 }
 
 export function runPublishingContractSuite(createDriver: () => PublishingPort): void {

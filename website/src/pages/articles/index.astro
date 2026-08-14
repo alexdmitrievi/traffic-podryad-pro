@@ -1,0 +1,21 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import { listPublishedArticles } from '../../lib/published'
+
+const articles = await listPublishedArticles()
+---
+<Layout title="Статьи — Pipupi" description="Опубликованные материалы Pipupi.">
+  <h1>Статьи</h1>
+  {articles.length === 0 ? (
+    <p class="notice">Публикаций пока нет.</p>
+  ) : (
+    <div class="grid">
+      {articles.map((article) => (
+        <a class="card" href={`/articles/${article.slug}`}>
+          <strong>{article.title}</strong>
+          <p class="notice">{article.description}</p>
+        </a>
+      ))}
+    </div>
+  )}
+</Layout>

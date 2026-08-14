@@ -1,0 +1,89 @@
+---
+interface Props {
+  title?: string
+  description?: string
+}
+const { title = 'Pipupi', description = 'Маркетинг, который можно измерить: SEO-контент, который приводит заявки.' } = Astro.props
+---
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <slot name="head" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: light; --accent: #0b5fff; --text: #111827; --muted: #6b7280; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--text); line-height: 1.6; }
+      header { border-bottom: 1px solid #e5e7eb; padding: 0 1rem; }
+      header nav { max-width: 60rem; margin: 0 auto; display: flex; gap: 1.25rem; align-items: center; height: 3.5rem; }
+      header a { color: var(--text); text-decoration: none; font-weight: 600; }
+      header a.logo { color: var(--accent); font-size: 1.15rem; }
+      main { max-width: 60rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+      footer { border-top: 1px solid #e5e7eb; padding: 1.5rem 1rem; color: var(--muted); font-size: 0.9rem; }
+      footer .inner { max-width: 60rem; margin: 0 auto; }
+      h1 { font-size: 1.9rem; }
+      h2 { font-size: 1.35rem; margin-top: 2rem; }
+      article.prose h1 { font-size: 1.7rem; }
+      article.prose p, article.prose h2, article.prose h3 { max-width: 45rem; }
+      .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+      .card { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; text-decoration: none; color: inherit; }
+      .card:hover { border-color: var(--accent); }
+      .cta-form { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.25rem; max-width: 28rem; }
+      .cta-form label { display: block; margin: 0.75rem 0 0.25rem; font-weight: 600; }
+      .cta-form input, .cta-form select, .cta-form textarea { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.35rem; font: inherit; }
+      .cta-form button { margin-top: 1rem; background: var(--accent); color: #fff; border: 0; border-radius: 0.35rem; padding: 0.6rem 1.2rem; font: inherit; font-weight: 600; cursor: pointer; }
+      .notice { color: var(--muted); }
+    </style>
+    <script is:inline>
+      // First-party attribution (docs/ATTRIBUTION.md): a random visitor id in a
+      // host-only cookie, and a touch per page view. No third-party pixels.
+      (function () {
+        const name = 'pip_vid'
+        const read = () => document.cookie.split('; ').find((c) => c.startsWith(name + '='))?.split('=')[1] || ''
+        const id = read() || crypto.randomUUID()
+        document.cookie = name + '=' + id + '; Path=/; Max-Age=' + 90 * 24 * 60 * 60 + '; SameSite=Lax; Secure'
+        const params = new URLSearchParams(location.search)
+        const body = {
+          visitorId: id,
+          path: location.pathname,
+          referrer: document.referrer || undefined,
+          utmSource: params.get('utm_source') || undefined,
+          utmMedium: params.get('utm_medium') || undefined,
+          utmCampaign: params.get('utm_campaign') || undefined,
+          utmContent: params.get('utm_content') || undefined,
+          utmTerm: params.get('utm_term') || undefined,
+        }
+        try {
+          fetch('/api/public/touches', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        } catch (_) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a class="logo" href="/">Pipupi</a>
+        <a href="/services/seo-content">SEO-контент</a>
+        <a href="/services/b2b-outreach">B2B outreach</a>
+        <a href="/services/telegram-marketing">Telegram</a>
+        <a href="/articles">Статьи</a>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer>
+      <div class="inner">
+        © {new Date().getFullYear()} Pipupi · <a href="/privacy">Политика конфиденциальности</a>
+      </div>
+    </footer>
+  </body>
+</html>

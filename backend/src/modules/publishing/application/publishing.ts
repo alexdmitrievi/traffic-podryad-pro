@@ -174,6 +174,9 @@ export async function runPublication(
     revisionId: publication.revisionId,
     slug: publication.contentItem.slug,
     html,
+    bodyMarkdown: publication.revision.bodyMarkdown,
+    title: publication.revision.metaTitle ?? publication.contentItem.title,
+    description: publication.revision.metaDescription,
   })
 
   await deps.db.$transaction(async (tx) => {

@@ -4,8 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "typecheck": "echo '@traffic/website: no TypeScript sources yet (Wave 4)'",
-    "build": "echo '@traffic/website: nothing to build yet (Wave 4)'",
-    "test": "echo '@traffic/website: no tests yet (Wave 4)'"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro sync && tsc --noEmit",
+    "test": "echo '@traffic/website: no tests yet (Wave 4e)'"
+  },
+  "dependencies": {
+    "astro": "^7.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^5.9.3"
   }
 }

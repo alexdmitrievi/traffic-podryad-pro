@@ -12,7 +12,12 @@ export interface PublishInput {
   contentItemId: string
   revisionId: string
   slug: string
+  /** The fully rendered public page. */
   html: string
+  /** The source the website build re-renders from, and the site's SSG reads. */
+  bodyMarkdown: string
+  title: string
+  description: string | null
 }
 
 export interface PublishResult {

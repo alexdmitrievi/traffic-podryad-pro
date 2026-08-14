@@ -1,0 +1,76 @@
+---
+/**
+ * The public CTA form (docs/ATTRIBUTION.md section 5). Consent is mandatory and verified
+ * on the server; the honeypot stays hidden from people and filled by bots.
+ *
+ * The script posts to the API with the visitor id from the attribution cookie, so the
+ * lead links to the touches recorded for this browser.
+ */
+const formId = 'lead-form'
+---
+<div class="cta-form">
+  <form id={formId} action="/api/public/leads" method="post" data-lead-form>
+    <label for="contact_name">Контактное лицо *</label>
+    <input id="contact_name" name="contactName" required data-testid="lead-contact-name" />
+
+    <label for="phone">Телефон</label>
+    <input id="phone" name="phone" placeholder="79001234567" data-testid="lead-phone" />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" data-testid="lead-email" />
+
+    <label for="message">Комментарий</label>
+    <textarea id="message" name="message" rows="3"></textarea>
+
+    <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true" />
+
+    <label>
+      <input type="checkbox" name="consent" value="true" required data-testid="lead-consent" />
+      Согласен на обработку персональных данных
+    </label>
+
+    <button type="submit" data-testid="lead-submit">Запросить цену</button>
+    <p class="notice" data-testid="lead-status" role="status"></p>
+  </form>
+</div>
+
+<script>
+  const form = document.getElementById('{formId}') as HTMLFormElement | null
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const status = form.querySelector('[data-testid="lead-status"]') as HTMLElement | null
+
+    const data = new FormData(form)
+    const cookie = document.cookie.split('; ').find((entry) => entry.startsWith('pip_vid='))
+    const visitorId = cookie?.split('=')[1] ?? crypto.randomUUID()
+
+    const payload = {
+      contactName: data.get('contactName'),
+      phone: data.get('phone') || undefined,
+      email: data.get('email') || undefined,
+      message: data.get('message') || undefined,
+      website: data.get('website') || undefined,
+      visitorId,
+      landingPath: location.pathname,
+      consent: true,
+      consentTextVersion: '2026-08-01',
+      privacyPolicyVersion: '2026-08-01',
+    }
+
+    try {
+      const response = await fetch('/api/public/leads', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (status) {
+        status.textContent = response.ok
+          ? 'Заявка принята. Мы свяжемся с вами.'
+          : 'Не удалось отправить заявку. Проверьте данные.'
+      }
+      if (response.ok) form.reset()
+    } catch {
+      if (status) status.textContent = 'Не удалось отправить заявку. Проверьте данные.'
+    }
+  })
+</script>

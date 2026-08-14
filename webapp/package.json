@@ -4,8 +4,23 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "typecheck": "echo '@traffic/webapp: no TypeScript sources yet (Wave 4)'",
-    "build": "echo '@traffic/webapp: nothing to build yet (Wave 4)'",
-    "test": "echo '@traffic/webapp: no tests yet (Wave 4)'"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "echo '@traffic/webapp: no unit tests yet (Wave 4e)'"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.4"
   }
 }

@@ -1,0 +1,76 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import { listPublishedArticles } from '../../lib/published'
+
+export async function getStaticPaths() {
+  const articles = await listPublishedArticles()
+  return articles.map((article) => ({
+    params: { slug: article.slug },
+    props: { article },
+  }))
+}
+
+interface Props {
+  article: {
+    slug: string
+    title: string
+    description: string | null
+    publishedAt: string
+    bodyMarkdown: string
+  }
+}
+
+const { article } = Astro.props
+const canonical = `https://pipupi.ru/articles/${article.slug}`
+
+/**
+ * A minimal renderer for the published markdown: headings and paragraphs. The site stays
+ * static — every byte of the article body is present in the source HTML.
+ */
+function renderMarkdown(source: string): string {
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const h1 = line.match(/^# (.+)$/)
+      if (h1) return `<h2>${escapeHtml(h1[1]!)}</h2>`
+      const h2 = line.match(/^## (.+)$/)
+      if (h2) return `<h2>${escapeHtml(h2[1]!)}</h2>`
+      const h3 = line.match(/^### (.+)$/)
+      if (h3) return `<h3>${escapeHtml(h3[1]!)}</h3>`
+      return `<p>${escapeHtml(line)}</p>`
+    })
+    .join('\n')
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+---
+
+<Layout title={article.title} description={article.description ?? article.title}>
+  <head slot="head">
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={article.title} />
+    <meta property="og:type" content="article" />
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: article.title,
+      description: article.description ?? article.title,
+      mainEntityOfPage: canonical,
+      datePublished: article.publishedAt,
+      inLanguage: 'ru',
+    })} />
+  </head>
+  <article class="prose" data-testid="article-body">
+    <h1>{article.title}</h1>
+    <p class="notice">Опубликовано: {new Date(article.publishedAt).toLocaleDateString('ru-RU')}</p>
+    <Fragment set:html={renderMarkdown(article.bodyMarkdown)} />
+  </article>
+</Layout>
