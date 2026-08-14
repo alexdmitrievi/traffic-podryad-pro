@@ -45,6 +45,7 @@ backend/.prisma-generate.lock
 
 # Local object storage driver
 backend/.storage/
+webapp/.storage/
 
 # Generated static website output before upload
 website/dist/
