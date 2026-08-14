@@ -4,15 +4,33 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "typecheck": "echo '@traffic/backend: no TypeScript sources yet (Wave 4)'",
-    "build": "echo '@traffic/backend: nothing to build yet (Wave 4)'",
-    "test": "bun test prisma",
+    "dev": "bun --watch src/entrypoints/api.ts",
+    "api": "bun src/entrypoints/api.ts",
+    "worker": "bun src/entrypoints/worker.ts",
+    "cron": "bun src/entrypoints/cron.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build src/entrypoints/api.ts src/entrypoints/worker.ts src/entrypoints/cron.ts --outdir dist --target bun --external pg --external @prisma/client --external @prisma/adapter-pg",
+    "test": "bun test src",
+    "test:integration": "bun run prisma:generate && bun run prisma:migrate:deploy:test && bun tests/integration/run.mjs",
     "prisma": "prisma",
     "prisma:validate": "prisma validate",
     "prisma:format": "prisma format",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy:test": "bun prisma/migrate-test.mjs",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "bun prisma/seed/index.mjs --write"
   },
   "devDependencies": {
-    "prisma": "^7.9.1"
+    "@types/bun": "^1.3.14",
+    "@types/pg": "^8.21.0",
+    "prisma": "^7.9.1",
+    "typescript": "5.9"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "hono": "^4.13.2",
+    "pg": "^8.23.0"
   }
 }

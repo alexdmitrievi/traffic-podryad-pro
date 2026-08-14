@@ -644,6 +644,7 @@ describe('contract tree', () => {
       'errors',
       'leads',
       'llmRuns',
+      'outbox',
       'plans',
       'research',
       'serviceRequests',

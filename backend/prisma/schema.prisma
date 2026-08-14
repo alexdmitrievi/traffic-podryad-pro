@@ -837,6 +837,54 @@ model AttributionTouch {
 }
 
 // =============================================================================
+// DURABLE OUTBOX
+//
+// Backend machinery rather than product data: no workspace scope, no user ownership.
+// A row is work that must not be lost: brief generation, draft generation, publication
+// and CDN invalidation travel through here (docs/ARCHITECTURE.md section 5).
+//
+// Claim protocol: a worker claims the row with a fencing token and a lease. Complete and
+// fail both require the matching token, so a worker whose lease expired can no longer
+// touch the row; a new claim preserves the attempt counter. `task_type` is an open set
+// validated in code against the task registry, not a database enum.
+// =============================================================================
+
+enum TaskOutboxStatus {
+  pending
+  running
+  dead
+
+  @@map("task_outbox_status")
+}
+
+model TaskOutbox {
+  id           String           @id @default(uuid(7)) @db.Uuid
+  taskType     String           @map("task_type")
+  /// The task's arguments. Written when the work is scheduled, read by the worker.
+  payload      Json
+  /// Enqueueing the same logical work twice must produce one row: the key is the
+  /// enqueuer's responsibility (for example "brief:<briefId>").
+  dedupeKey    String           @unique(map: "task_outbox_dedupe_key_key") @map("dedupe_key")
+  status       TaskOutboxStatus @default(pending)
+  attempts     Int              @default(0)
+  maxAttempts  Int              @default(8) @map("max_attempts")
+  /// Retry scheduling. A failed task becomes claimable again only after this moment.
+  availableAt  DateTime         @default(now()) @map("available_at")
+  /// While running, the lease bounds the claim. Expired leases are reclaimed by the
+  /// next claim without resetting the attempt counter.
+  leaseUntil   DateTime?        @map("lease_until")
+  /// The claim's identity. Complete and fail require it; a mismatch means the lease
+  /// was lost and the operation is ignored.
+  fencingToken String?          @map("fencing_token")
+  lastError    String?          @map("last_error")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, availableAt], map: "task_outbox_status_available_at_idx")
+  @@map("task_outbox")
+}
+
+// =============================================================================
 // LLM RUNS AND AUDIT
 // =============================================================================
 

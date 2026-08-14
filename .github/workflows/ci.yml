@@ -107,12 +107,48 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Parses and validates the schema. No database is contacted: Prisma 7 keeps connection
-      # URLs out of the schema entirely, and no migration exists in this wave.
+      # URLs out of the schema entirely. Migrations are applied in the integration job.
       - name: Validate schema
         run: bun run prisma:validate
 
       - name: Generate client
         run: bun run prisma:generate
+
+  integration:
+    name: Integration (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: pipupi_test
+          POSTGRES_USER: pipupi
+          POSTGRES_PASSWORD: pipupi_local_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pipupi -d pipupi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://pipupi:pipupi_local_password@localhost:5432/pipupi_test
+      TEST_DATABASE_URL: postgresql://pipupi:pipupi_local_password@localhost:5432/pipupi_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      # The backend script runs prisma generate, prisma migrate deploy against the test
+      # database and then the integration suite: the outbox claim protocol under
+      # concurrency, health readiness and the catalog seed.
+      - name: Run integration tests
+        run: bun run test:integration
 
   build:
     name: Build

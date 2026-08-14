@@ -23,9 +23,14 @@
 
 | Шаблон имени | Раннер | Требует |
 | --- | --- | --- |
-| `*.integration.test.ts` | `test:integration` | Docker PostgreSQL |
+| `*.integration.test.ts` | `bun run test:integration` (последовательный прогон файлов в `backend/tests/integration/run.mjs`) | Docker PostgreSQL |
 | `*.live.test.ts` | `test:live` | Внешний сервис, запускаемый отдельно |
-| `*.test.ts` | `test:unit` | Ничего |
+| `*.test.ts` | `bun test src` | Ничего |
+
+Интеграционные файлы прогоняются **последовательно**, а не параллельно: тесты делят одну
+базу, а drain-тесты outbox запускают настоящие циклы захвата, которые в параллельном
+прогоне уводили бы строки у других файлов. Конкурентность проверяется внутри тестов
+(два дренажа, два воркера), а не между файлами.
 
 Категория `live` существует, чтобы `bun run test` оставался запускаемым на машине без Docker. Live-тест, попавший в unit-набор, падал бы у всех, кто не поднял контейнер, — а красный набор, который все привыкли игнорировать, хуже отсутствующего.
 
@@ -51,8 +56,8 @@
 bun run architecture:check     # границы модулей, AC-1..AC-3
 bun run typecheck              # все workspace
 bun run test:contracts         # Zod-схемы
-bun run test:backend:unit
-bun run test:backend:integration
+bun run test:backend:unit      # backend unit, без Docker
+bun run test:integration       # backend против Docker PostgreSQL: outbox, health, сиды
 bun run test:webapp
 bun run build:website
 bun run e2e:webapp

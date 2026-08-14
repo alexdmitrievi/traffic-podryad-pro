@@ -28,6 +28,7 @@ import * as errors from './errors'
 import * as keywords from './keywords'
 import * as llmRuns from './llm-runs'
 import * as leads from './leads'
+import * as outbox from './outbox'
 import * as serviceRequestPlans from './service-request-plans'
 import * as serviceRequests from './service-requests'
 import * as topicClusters from './topic-clusters'
@@ -69,6 +70,9 @@ export const contracts = {
 
   /** Model usage and its cost. */
   llmRuns,
+
+  /** Durable outbox machinery; backend infrastructure with enum parity to the schema. */
+  outbox,
 } as const
 
 export type Contracts = typeof contracts
@@ -83,6 +87,7 @@ export * from './errors'
 export * from './keywords'
 export * from './leads'
 export * from './llm-runs'
+export * from './outbox'
 export * from './service-request-plans'
 export * from './service-requests'
 export * from './topic-clusters'

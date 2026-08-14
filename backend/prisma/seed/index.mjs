@@ -8,8 +8,7 @@
  *
  * What this file does today: read the datasets, validate every row against
  * `@traffic/contracts`, resolve the region tree, and fail loudly on a broken reference.
- * Writing to the database arrives in Wave 4 together with Prisma Client — see `applySeed`
- * at the bottom for the exact shape that step will take.
+ * With `--write` it upserts the validated catalog into the database idempotently.
  *
  * Validating here rather than at insert time is deliberate: a bad reference in seed data is
  * a typo somebody can fix in seconds, and finding it halfway through an insert leaves a
@@ -159,16 +158,105 @@ export async function loadSeedData() {
 }
 
 /**
- * Wave 4. The write is intentionally not implemented yet: it needs Prisma Client, a running
- * database and migrations, none of which exist in this wave. The shape is fixed though —
- * insert regions in the order `loadSeedData` returns them, then each vertical with its
- * categories, products and delivery bases, all upserted by (workspace_id, code) so a re-run
- * is idempotent.
+ * Writes the validated catalog to the database, idempotently.
+ *
+ * Everything is upserted by (workspace_id, code) — or (workspace_id, slug) for products —
+ * so a re-run converges instead of duplicating. Regions are inserted in the order
+ * `loadSeedData` returns: parents first, so a child can resolve its parent id in the same
+ * pass. The first (and only, in the MVP) workspace is created by slug.
  */
-export async function applySeed() {
-  throw new Error(
-    'applySeed is implemented in Wave 4, once Prisma Client and migrations exist. Use loadSeedData() to inspect the dataset.',
-  )
+export async function applySeed(db, { regions, verticals }) {
+  const workspace = await db.workspace.upsert({
+    where: { slug: 'pipupi' },
+    update: { name: 'Pipupi' },
+    create: { slug: 'pipupi', name: 'Pipupi', locale: 'ru' },
+  })
+
+  const regionIds = new Map()
+  for (const row of regions) {
+    const parentId = row.parent ? regionIds.get(row.parent) ?? null : null
+    const region = await db.region.upsert({
+      where: { workspaceId_code: { workspaceId: workspace.id, code: row.code } },
+      update: { name: row.name, kind: row.kind, parentId },
+      create: {
+        workspaceId: workspace.id,
+        code: row.code,
+        name: row.name,
+        kind: row.kind,
+        parentId,
+      },
+    })
+    regionIds.set(row.code, region.id)
+  }
+
+  for (const dataset of verticals) {
+    const vertical = await db.vertical.upsert({
+      where: { workspaceId_code: { workspaceId: workspace.id, code: dataset.vertical.code } },
+      update: { name: dataset.vertical.name, description: dataset.vertical.description ?? null },
+      create: {
+        workspaceId: workspace.id,
+        code: dataset.vertical.code,
+        name: dataset.vertical.name,
+        description: dataset.vertical.description ?? null,
+      },
+    })
+
+    for (const category of dataset.categories) {
+      const savedCategory = await db.productCategory.upsert({
+        where: { workspaceId_code: { workspaceId: workspace.id, code: category.code } },
+        update: {
+          verticalId: vertical.id,
+          name: category.name,
+          slug: category.slug,
+          position: category.position ?? 0,
+        },
+        create: {
+          workspaceId: workspace.id,
+          verticalId: vertical.id,
+          code: category.code,
+          name: category.name,
+          slug: category.slug,
+          position: category.position ?? 0,
+        },
+      })
+
+      for (const product of category.products) {
+        await db.product.upsert({
+          where: { workspaceId_slug: { workspaceId: workspace.id, slug: product.slug } },
+          update: {
+            categoryId: savedCategory.id,
+            name: product.name,
+            unit: product.unit,
+            synonyms: product.synonyms,
+          },
+          create: {
+            workspaceId: workspace.id,
+            categoryId: savedCategory.id,
+            name: product.name,
+            slug: product.slug,
+            unit: product.unit,
+            synonyms: product.synonyms,
+          },
+        })
+      }
+    }
+
+    for (const basis of dataset.deliveryBases ?? []) {
+      await db.deliveryBasis.upsert({
+        where: { workspaceId_code: { workspaceId: workspace.id, code: basis.code } },
+        update: { verticalId: vertical.id, name: basis.name, position: basis.position ?? 0 },
+        create: {
+          workspaceId: workspace.id,
+          verticalId: vertical.id,
+          code: basis.code,
+          name: basis.name,
+          position: basis.position ?? 0,
+        },
+      })
+    }
+  }
+
+  return { workspaceId: workspace.id }
 }
 
 async function main() {
@@ -183,7 +271,26 @@ async function main() {
   console.log(`  categories     : ${categories.length}`)
   console.log(`  products       : ${products.length}`)
   console.log(`  delivery bases : ${deliveryBases.length}`)
-  console.log('\nWriting to the database arrives in Wave 4 (applySeed).')
+
+  if (!process.argv.includes('--write')) {
+    console.log('\nValidation only. Run with --write to upsert the catalog into DATABASE_URL.')
+    return
+  }
+
+  // The generated client is imported lazily so the validation path keeps working in CI
+  // before `prisma generate` has run.
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required to write the seed')
+  }
+  const { createDb } = await import('../../src/db.ts')
+  const db = createDb(databaseUrl)
+  try {
+    const result = await applySeed(db, { regions, verticals })
+    console.log(`\nSeed applied. workspace: ${result.workspaceId}`)
+  } finally {
+    await db.$disconnect()
+  }
 }
 
 if (import.meta.main) await main()

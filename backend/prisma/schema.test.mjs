@@ -55,13 +55,15 @@ function parseEnums(source) {
 const models = parseModels(schema)
 const enums = parseEnums(schema)
 
-/** Tables that legitimately have no workspace scope: they hang off a user or a request. */
+/** Tables that legitimately have no workspace scope: they hang off a user or a request,
+ *  or they are backend machinery rather than product data (the durable outbox). */
 const workspaceExempt = new Set([
   'Workspace',
   'User',
   'AuthSession',
   'PasswordResetToken',
   'ClusterKeyword',
+  'TaskOutbox',
 ])
 
 describe('models', () => {
@@ -93,6 +95,7 @@ describe('models', () => {
       'AttributionTouch',
       'LlmRun',
       'AuditLog',
+      'TaskOutbox',
     ]) {
       expect(models.has(name)).toBe(true)
     }
@@ -240,6 +243,7 @@ describe('enums match the contracts', () => {
     ['TouchPosition', contracts.attribution.touchPositionSchema],
     ['LlmRunPurpose', contracts.llmRuns.llmRunPurposeSchema],
     ['LlmRunStatus', contracts.llmRuns.llmRunStatusSchema],
+    ['TaskOutboxStatus', contracts.outbox.taskOutboxStatusSchema],
   ]
 
   for (const [enumName, zodSchema] of pairs) {
