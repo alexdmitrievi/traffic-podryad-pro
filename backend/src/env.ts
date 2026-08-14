@@ -39,6 +39,17 @@ export interface Env {
   // ── HTTP surfaces ───────────────────────────────────────────────────────────
   corsPublicOrigins: string[]
   corsAppOrigins: string[]
+
+  // ── Providers ───────────────────────────────────────────────────────────────
+  llmProvider: 'fake' | 'deepseek'
+  deepseekBaseUrl: string
+  deepseekModel: string
+  deepseekApiKey: string
+  llmTimeoutMs: number
+  llmMaxOutputTokens: number
+  /** Kopecks? No — integer minor units, as stored in llm_runs. Null = no cap. */
+  llmMonthlyCostCapMinorUnits: number | null
+  keywordsCsvMaxRows: number
 }
 
 export class EnvValidationError extends Error {
@@ -195,6 +206,32 @@ function readOrigins(source: Record<string, string | undefined>, key: string): s
   return origins
 }
 
+function readLlmProvider(source: Record<string, string | undefined>): 'fake' | 'deepseek' {
+  const value = readString(source, 'LLM_PROVIDER') ?? 'fake'
+  if (value !== 'fake' && value !== 'deepseek') {
+    throw new EnvValidationError([`LLM_PROVIDER must be "fake" or "deepseek", got "${value}"`])
+  }
+  return value
+}
+
+/**
+ * Optional positive integer: an empty value means the limit is off. The LLM cost cap is
+ * exactly this shape — unset is unlimited, which is the dangerous default, so the parser
+ * returns null explicitly and the recorder treats null as "no cap".
+ */
+function readOptionalPositiveInt(
+  source: Record<string, string | undefined>,
+  key: string,
+): number | null {
+  const raw = readString(source, key)
+  if (raw === undefined) return null
+  const value = Number(raw)
+  if (!Number.isInteger(value) || value < 1) {
+    throw new EnvValidationError([`${key} must be a positive integer or empty, got "${raw}"`])
+  }
+  return value
+}
+
 export function loadEnv(source: Record<string, string | undefined>): Env {
   // Order matters for diagnostics: the fuses and the database URL are validated before
   // anything that depends on them, so a broken guard is reported as the guard, not as a
@@ -215,6 +252,10 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
       `CORS_PUBLIC_ORIGINS and CORS_APP_ORIGINS must not overlap (${overlapping.join(', ')}): the two policies exist because they differ in credentials`,
     ])
   }
+
+  // The environment declares the cap in whole rubles; the database stores integer minor
+  // units, so the conversion happens once, here.
+  const capRub = readOptionalPositiveInt(source, 'LLM_MONTHLY_COST_CAP_RUB')
 
   return {
     nodeEnv,
@@ -237,6 +278,14 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
     authCookieSameSite: readAuthCookieSameSite(source),
     corsPublicOrigins,
     corsAppOrigins,
+    llmProvider: readLlmProvider(source),
+    deepseekBaseUrl: readString(source, 'DEEPSEEK_BASE_URL') ?? 'https://api.deepseek.com',
+    deepseekModel: readString(source, 'DEEPSEEK_MODEL') ?? 'deepseek-v4-pro',
+    deepseekApiKey: readString(source, 'DEEPSEEK_API_KEY') ?? '',
+    llmTimeoutMs: readPositiveInt(source, 'LLM_TIMEOUT_MS', 120_000),
+    llmMaxOutputTokens: readPositiveInt(source, 'LLM_MAX_OUTPUT_TOKENS', 8192),
+    llmMonthlyCostCapMinorUnits: capRub === null ? null : capRub * 100,
+    keywordsCsvMaxRows: readPositiveInt(source, 'KEYWORDS_CSV_MAX_ROWS', 50_000),
   }
 }
 

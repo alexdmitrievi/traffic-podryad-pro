@@ -127,6 +127,22 @@ describe('loadEnv', () => {
       }),
     ).toThrow('must not overlap')
   })
+
+  test('provider settings parse with safe defaults', () => {
+    const env = loadEnv({ ...valid })
+    expect(env.llmProvider).toBe('fake')
+    expect(env.deepseekBaseUrl).toBe('https://api.deepseek.com')
+    expect(env.llmTimeoutMs).toBe(120_000)
+    expect(env.llmMonthlyCostCapMinorUnits).toBeNull()
+    expect(env.keywordsCsvMaxRows).toBe(50_000)
+
+    const capped = loadEnv({ ...valid, LLM_MONTHLY_COST_CAP_RUB: '500' })
+    expect(capped.llmMonthlyCostCapMinorUnits).toBe(50_000)
+    expect(() => loadEnv({ ...valid, LLM_MONTHLY_COST_CAP_RUB: 'zero' })).toThrow(
+      'LLM_MONTHLY_COST_CAP_RUB',
+    )
+    expect(() => loadEnv({ ...valid, LLM_PROVIDER: 'openai' })).toThrow('LLM_PROVIDER')
+  })
 })
 
 describe('the process refuses to boot with a non-zero exit code', () => {

@@ -19,6 +19,15 @@ import { createDrainLoop, drainOnce } from './outbox/drain-loop'
 import type { DrainLoop, TaskHandlerRegistry } from './outbox/drain-loop'
 import { createOutbox } from './outbox/outbox-service'
 import type { Outbox } from './outbox/outbox-service'
+import { createDeepseekDriver } from './providers/llm/deepseek-driver'
+import { createFakeLlmDriver } from './providers/llm/fake-driver'
+import { createInstrumentedLlmPort } from './providers/llm/instrumentation'
+import { createGuardedLlmPort } from './providers/llm/pii-guard'
+import type { LlmPort } from './providers/llm/port'
+import { createCsvKeywordDriver } from './providers/keywords/csv-driver'
+import type { KeywordSourcePort } from './providers/keywords/port'
+import { createFilesystemPublishingDriver } from './providers/publishing/filesystem-driver'
+import type { PublishingPort } from './providers/publishing/port'
 import { createScheduler } from './scheduler'
 import type { Scheduler } from './scheduler'
 import type { JobHandlerRegistry } from './job-types'
@@ -29,6 +38,9 @@ export interface Runtime {
   db: ReturnType<typeof createDb>
   outbox: Outbox
   app: Hono
+  llm: LlmPort
+  keywordSource: KeywordSourcePort
+  publishing: PublishingPort
   drainLoop: DrainLoop
   scheduler: Scheduler
   /** Runs every registered periodic job once and returns. The cron entrypoint. */
@@ -49,6 +61,33 @@ export function createRuntime(env: Env): Runtime {
       appOrigins: env.corsAppOrigins,
     },
   })
+
+  const rawLlm: LlmPort =
+    env.llmProvider === 'deepseek'
+      ? createDeepseekDriver({
+          baseUrl: env.deepseekBaseUrl,
+          model: env.deepseekModel,
+          apiKey: env.deepseekApiKey,
+          timeoutMs: env.llmTimeoutMs,
+          maxOutputTokens: env.llmMaxOutputTokens,
+        })
+      : createFakeLlmDriver()
+
+  // Guard → instrumentation → driver: personal data is refused before anything is
+  // recorded (a PII payload leaves no llm_runs row at all), and every call that reaches
+  // the driver leaves one.
+  const llm = createGuardedLlmPort(
+    createInstrumentedLlmPort(rawLlm, {
+      db,
+      provider: env.llmProvider === 'deepseek' ? 'deepseek' : 'fake',
+      model: env.llmProvider === 'deepseek' ? env.deepseekModel : 'fake-deterministic',
+      workspaceSlug: 'pipupi',
+      monthlyCapMinorUnits: env.llmMonthlyCostCapMinorUnits,
+    }),
+  )
+
+  const keywordSource = createCsvKeywordDriver({ maxRows: env.keywordsCsvMaxRows })
+  const publishing = createFilesystemPublishingDriver({ rootDirectory: '.storage/public' })
 
   const auth = createAuthModule({
     db,
@@ -96,6 +135,9 @@ export function createRuntime(env: Env): Runtime {
     db,
     outbox,
     app,
+    llm,
+    keywordSource,
+    publishing,
     drainLoop: createDrainLoop(drainDeps),
     scheduler: createScheduler({ jobs, handlers: jobHandlers }),
     runJobsOnce: async () => {
