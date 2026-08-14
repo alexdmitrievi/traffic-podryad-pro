@@ -64,6 +64,7 @@ model Workspace {
   evidenceSources   EvidenceSource[]
   claims            Claim[]
   citations         Citation[]
+  geoQueries        GeoQuery[]
 
   @@map("workspaces")
 }
@@ -195,6 +196,7 @@ model Region {
   topicClusters TopicCluster[]
   contentItems  ContentItem[]
   leads         Lead[]
+  geoQueries    GeoQuery[]
 
   @@unique([workspaceId, code], map: "regions_workspace_id_code_key")
   @@index([workspaceId, kind], map: "regions_workspace_id_kind_idx")
@@ -251,6 +253,7 @@ model Product {
   topicClusters TopicCluster[]
   contentItems  ContentItem[]
   leads         Lead[]
+  geoQueries    GeoQuery[]
 
   @@unique([workspaceId, slug], map: "products_workspace_id_slug_key")
   @@index([workspaceId, categoryId], map: "products_workspace_id_category_id_idx")
@@ -508,6 +511,7 @@ model TopicCluster {
 
   keywords ClusterKeyword[]
   briefs   ContentBrief[]
+  geoQueries GeoQuery[]
 
   @@index([workspaceId, status], map: "topic_clusters_workspace_id_status_idx")
   @@index([requestId], map: "topic_clusters_request_id_idx")
@@ -941,6 +945,59 @@ model Citation {
 
   @@index([claimId], map: "claim_citations_claim_id_idx")
   @@map("claim_citations")
+}
+
+// =============================================================================
+// GEO INVENTORY (GEO wave, unit 2)
+//
+// Questions real users and machine dialogues ask, triaged by a human. The
+// inventory feeds answer assets (unit 4); snapshots of visibility (unit 3)
+// measure the result. A question describes the audience's demand; it never
+// enumerates a person.
+// =============================================================================
+
+enum GeoQueryPriority {
+  low
+  medium
+  high
+
+  @@map("geo_query_priority")
+}
+
+enum GeoQueryStatus {
+  open
+  planned
+  answered
+  dismissed
+
+  @@map("geo_query_status")
+}
+
+model GeoQuery {
+  id           String           @id @default(uuid(7)) @db.Uuid
+  workspaceId  String           @map("workspace_id") @db.Uuid
+  /// The question as asked, in Russian.
+  question     String
+  clusterId    String?          @map("cluster_id") @db.Uuid
+  productId    String?          @map("product_id") @db.Uuid
+  regionId     String?          @map("region_id") @db.Uuid
+  priority     GeoQueryPriority @default(medium)
+  /// open → planned → answered, or dismissed at any triage point. Terminal states
+  /// are answered and dismissed; a dismissal records why.
+  status       GeoQueryStatus   @default(open)
+  statusReason String?          @map("status_reason")
+  notes        String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "geo_queries_workspace_id_fkey")
+  cluster   TopicCluster?  @relation(fields: [clusterId], references: [id], onDelete: SetNull, map: "geo_queries_cluster_id_fkey")
+  product   Product?       @relation(fields: [productId], references: [id], onDelete: SetNull, map: "geo_queries_product_id_fkey")
+  region    Region?        @relation(fields: [regionId], references: [id], onDelete: SetNull, map: "geo_queries_region_id_fkey")
+
+  @@index([workspaceId, status], map: "geo_queries_workspace_id_status_idx")
+  @@index([workspaceId, clusterId], map: "geo_queries_workspace_id_cluster_id_idx")
+  @@map("geo_queries")
 }
 
 // =============================================================================

@@ -6,6 +6,7 @@ import { ResearchPage } from './features/research'
 import { ContentPage } from './features/content'
 import { FunnelPage, LeadsPage, PublicationsPage } from './features/publications'
 import { EvidencePage } from './features/evidence'
+import { GeoPage } from './features/geo'
 import { Button } from './components/ui'
 import { api, bootstrapSession } from './platform/api'
 import './styles.css'
@@ -37,6 +38,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           </NavLink>
           <NavLink to="/evidence" data-testid="nav-evidence">
             Факты
+          </NavLink>
+          <NavLink to="/geo" data-testid="nav-geo">
+            GEO
           </NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -70,6 +74,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/funnel" element={<FunnelPage />} />
           <Route path="/evidence" element={<EvidencePage />} />
+          <Route path="/geo" element={<GeoPage />} />
           <Route path="*" element={<Navigate to="/requests" replace />} />
         </Routes>
       </main>

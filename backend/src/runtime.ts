@@ -24,6 +24,7 @@ import { createLeadsModule } from './modules/leads'
 import { createAttributionModule } from './modules/attribution'
 import { createAnalyticsModule } from './modules/analytics'
 import { createEvidenceModule } from './modules/evidence'
+import { createGeoModule } from './modules/geo'
 import { createRateLimiter } from './http/rate-limiter'
 import { createDrainLoop, drainOnce } from './outbox/drain-loop'
 import type { DrainLoop, TaskHandlerRegistry } from './outbox/drain-loop'
@@ -157,6 +158,7 @@ export function createRuntime(env: Env): Runtime {
   const attribution = createAttributionModule({ db, rateLimit: publicRateLimit, auth: authPick })
   const analytics = createAnalyticsModule({ db, auth: authPick })
   const evidence = createEvidenceModule({ db, auth: authPick })
+  const geo = createGeoModule({ db, auth: authPick })
 
   app.route('/api/auth', auth.routes)
   app.route('/api/users', users.routes)
@@ -171,6 +173,7 @@ export function createRuntime(env: Env): Runtime {
   app.route('/api/public', attribution.publicRoutes)
   app.route('/api/analytics', analytics.routes)
   app.route('/api/evidence', evidence.routes)
+  app.route('/api/geo', geo.routes)
 
   const taskHandlers: TaskHandlerRegistry = {
     ...content.taskHandlers,

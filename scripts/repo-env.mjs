@@ -47,6 +47,7 @@ export const fixtureExemptions = {
     // The E2E scenarios sign in with a fake admin credential by design.
     'webapp/e2e/pipeline.spec.ts',
     'webapp/e2e/evidence.spec.ts',
+    'webapp/e2e/geo.spec.ts',
   ],
   'architecture-check': ['scripts/architecture-check.test.mjs'],
 }

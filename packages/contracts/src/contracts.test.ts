@@ -732,6 +732,48 @@ describe('evidence', () => {
   })
 })
 
+// ── geo queries ──────────────────────────────────────────────────────────────
+
+describe('geo queries', () => {
+  test('a valid query parses with defaults', () => {
+    const parsed = contracts.geoQueries.createGeoQuerySchema.parse({
+      question: 'Как купить дизельное топливо оптом в Омске?',
+    })
+
+    expect(parsed.priority).toBe('medium')
+    expect(parsed.clusterId).toBeUndefined()
+  })
+
+  test('an unknown priority or status is rejected', () => {
+    expect(
+      contracts.geoQueries.geoQueryPrioritySchema.safeParse('urgent').success,
+    ).toBe(false)
+    expect(
+      contracts.geoQueries.geoQueryStatusSchema.safeParse('done').success,
+    ).toBe(false)
+  })
+
+  test('a triage update must change at least one field', () => {
+    expect(contracts.geoQueries.updateGeoQuerySchema.safeParse({}).success).toBe(false)
+    expect(
+      contracts.geoQueries.updateGeoQuerySchema.safeParse({ status: 'planned' }).success,
+    ).toBe(true)
+  })
+
+  test('the update payload rejects unknown fields', () => {
+    expect(
+      contracts.geoQueries.updateGeoQuerySchema.safeParse({ status: 'planned', question: 'x' })
+        .success,
+    ).toBe(false)
+  })
+
+  test('a question without text is rejected', () => {
+    expect(
+      contracts.geoQueries.createGeoQuerySchema.safeParse({ question: '  ' }).success,
+    ).toBe(false)
+  })
+})
+
 // ── the tree itself ──────────────────────────────────────────────────────────
 
 describe('contract tree', () => {
@@ -745,6 +787,7 @@ describe('contract tree', () => {
       'content',
       'errors',
       'evidence',
+      'geoQueries',
       'leads',
       'llmRuns',
       'outbox',

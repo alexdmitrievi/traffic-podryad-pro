@@ -96,6 +96,7 @@ describe('models', () => {
       'EvidenceSource',
       'Claim',
       'Citation',
+      'GeoQuery',
       'LlmRun',
       'AuditLog',
       'TaskOutbox',
@@ -248,6 +249,8 @@ describe('enums match the contracts', () => {
     ['LlmRunStatus', contracts.llmRuns.llmRunStatusSchema],
     ['TaskOutboxStatus', contracts.outbox.taskOutboxStatusSchema],
     ['EvidenceSourceKind', contracts.evidence.evidenceSourceKindSchema],
+    ['GeoQueryPriority', contracts.geoQueries.geoQueryPrioritySchema],
+    ['GeoQueryStatus', contracts.geoQueries.geoQueryStatusSchema],
   ]
 
   for (const [enumName, zodSchema] of pairs) {
