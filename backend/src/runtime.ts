@@ -81,6 +81,11 @@ export function createRuntime(env: Env): Runtime {
           apiKey: env.deepseekApiKey,
           timeoutMs: env.llmTimeoutMs,
           maxOutputTokens: env.llmMaxOutputTokens,
+          pricing: {
+            inputPriceUsdPer1m: env.deepseekInputPriceUsdPer1m,
+            outputPriceUsdPer1m: env.deepseekOutputPriceUsdPer1m,
+            usdToRubRate: env.deepseekUsdToRubRate,
+          },
         })
       : createFakeLlmDriver()
 

@@ -89,9 +89,10 @@ service request (seo_content)
 Критерий готовности: на проде существует опубликованная статья, пришедший через её CTA лид и запись атрибуции, связывающая их, — и всё это воспроизводится одним E2E-тестом.
 
 > **Реализовано.** Конвейер работает сквозно; в генерации сейчас участвует
-> детерминированный fake-драйвер `LlmPort` (`LLM_PROVIDER=fake`), боевой DeepSeek
-> включается отдельным шагом после ревью границы ПДн и учёта стоимости
-> ([docs/WAVE_4_DELEGATION.md](docs/WAVE_4_DELEGATION.md) §6). PII-guard, `llm_runs` и
+> детерминированный fake-драйвер `LlmPort` (`LLM_PROVIDER=fake`). Боевой DeepSeek
+> подготовлен: граница ПДн отревьюена, учёт стоимости реализован, включение — после
+> живой проверки с ключом ([docs/WAVE_4_DELEGATION.md](docs/WAVE_4_DELEGATION.md) §6,
+> [CHECKLIST.md](CHECKLIST.md) §12.3). PII-guard, `llm_runs` и
 > `LLM_MONTHLY_COST_CAP_RUB` работают уже сейчас.
 
 Пошаговое описание конвейера — в [docs/CONTENT_PIPELINE.md](docs/CONTENT_PIPELINE.md).
@@ -208,12 +209,17 @@ MVP-срез **работает локально целиком**: заявка 
 1. **Production verification gate PostgreSQL** — 8 пунктов на реальном кластере Yandex
    Managed Service for PostgreSQL, фактический вывод команд записывается в
    [CHECKLIST.md](CHECKLIST.md) §12.1. До закрытия ворот в схему не попадают векторные
-   колонки, и ничего не утверждается о `pgvector` в проде.
+   колонки, и ничего не утверждается о `pgvector` в проде. *Требует внешнего ресурса:
+   реального кластера Yandex Cloud — на 2026-08-14 его нет, шаг не исполним кодом.*
 2. **Реальный CSV ключей** для первой ниши (нефтепродукты, СФО/УФО) — конвейер не
-   проверяется на синтетике, см. [CHECKLIST.md](CHECKLIST.md) §12.2.
-3. **Боевой DeepSeek** — отдельный шаг после ревью: цены за токены, `llm_runs` уже
-   пишутся, `LLM_MONTHLY_COST_CAP_RUB` уже работает; live-сьют —
-   `backend/src/providers/llm/deepseek.live.test.ts` (нужен `DEEPSEEK_API_KEY`).
+   проверяется на синтетике, см. [CHECKLIST.md](CHECKLIST.md) §12.2. *Требует внешнего
+   ресурса: файла ключей от владельца продукта.*
+3. **Боевой DeepSeek** — ревью границы ПДн пройдено и учёт стоимости реализован:
+   драйвер считает счёт в рублях из цен провайдера и курса ЦБ, ключ без цен/курса/
+   `LLM_MONTHLY_COST_CAP_RUB` — отказ стартовать; live-сьют —
+   `backend/src/providers/llm/deepseek.live.test.ts` (нужен `DEEPSEEK_API_KEY` в
+   `backend/.env`, `bun run --cwd backend test:live`). Осталось: живая проверка с
+   ключом, затем `LLM_PROVIDER=deepseek`. Запись — [CHECKLIST.md](CHECKLIST.md) §12.3.
 4. **Развёртывание** по чек-листу [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §9: Managed
    PostgreSQL, Object Storage, CDN, DNS/TLS по [docs/DOMAINS.md](docs/DOMAINS.md),
    секреты в хранилище площадки. Staging с `X-Robots-Tag: noindex`.

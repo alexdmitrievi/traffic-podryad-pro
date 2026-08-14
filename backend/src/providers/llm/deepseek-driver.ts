@@ -18,12 +18,22 @@ import type {
   LlmResult,
 } from './port'
 
+export interface DeepseekPricing {
+  /** USD per 1M input tokens, as billed by the provider. */
+  inputPriceUsdPer1m: number | null
+  /** USD per 1M output tokens, as billed by the provider. */
+  outputPriceUsdPer1m: number | null
+  /** RUB per 1 USD; the bill is USD, the cap is RUB. */
+  usdToRubRate: number | null
+}
+
 export interface DeepseekDriverOptions {
   baseUrl: string
   model: string
   apiKey: string
   timeoutMs: number
   maxOutputTokens: number
+  pricing: DeepseekPricing
 }
 
 export class DeepseekUnavailableError extends Error {
@@ -45,6 +55,27 @@ interface DeepseekResponse {
 
 const systemPrompt =
   'Ты — редактор SEO-контента. Пиши по-русски. Помечай места, требующие проверки фактов человеком, явными маркерами. Не выдумывай характеристики, цены и нормативы.'
+
+/**
+ * The bill in integer RUB kopecks: tokens × USD price per token × RUB rate. Rounded up —
+ * an undercounted kopeck is an undercounted cap. Null when the provider reported no tokens
+ * or the pricing is not configured (a real key refuses to boot without it, so a null here
+ * means "no tokens to bill", not "forgot to configure").
+ */
+export function deepseekCostMinorUnitsRub(
+  usage: { inputTokens: number | null | undefined; outputTokens: number | null | undefined },
+  pricing: DeepseekPricing,
+): number | null {
+  if (pricing.inputPriceUsdPer1m === null || pricing.outputPriceUsdPer1m === null || pricing.usdToRubRate === null) {
+    return null
+  }
+  const inputTokens = usage.inputTokens ?? 0
+  const outputTokens = usage.outputTokens ?? 0
+  if (inputTokens === 0 && outputTokens === 0) return 0
+  const inputRub = (inputTokens * pricing.inputPriceUsdPer1m * pricing.usdToRubRate) / 1_000_000
+  const outputRub = (outputTokens * pricing.outputPriceUsdPer1m * pricing.usdToRubRate) / 1_000_000
+  return Math.ceil((inputRub + outputRub) * 100)
+}
 
 function toJson(markdown: string): unknown {
   const start = markdown.indexOf('{')
@@ -99,12 +130,20 @@ export function createDeepseekDriver(options: DeepseekDriverOptions): LlmPort {
       throw new DeepseekUnavailableError('DeepSeek returned no completion content')
     }
 
+    const usage = {
+      inputTokens: body.usage?.prompt_tokens ?? 0,
+      outputTokens: body.usage?.completion_tokens ?? 0,
+    }
+
+    return { text, usage }
+  }
+
+  const bill = (usage: { inputTokens: number; outputTokens: number }) => {
+    const costMinorUnits = deepseekCostMinorUnitsRub(usage, options.pricing)
     return {
-      text,
-      usage: {
-        inputTokens: body.usage?.prompt_tokens ?? 0,
-        outputTokens: body.usage?.completion_tokens ?? 0,
-      },
+      ...usage,
+      costMinorUnits,
+      costCurrency: costMinorUnits === null ? null : 'RUB',
     }
   }
 
@@ -121,7 +160,7 @@ export function createDeepseekDriver(options: DeepseekDriverOptions): LlmPort {
       })
       return {
         content: toJson(text) as GenerateBriefOutput,
-        usage: { ...usage, costMinorUnits: null, costCurrency: null },
+        usage: bill(usage),
       }
     },
 
@@ -138,7 +177,7 @@ export function createDeepseekDriver(options: DeepseekDriverOptions): LlmPort {
       })
       return {
         content: toJson(text) as GenerateDraftOutput,
-        usage: { ...usage, costMinorUnits: null, costCurrency: null },
+        usage: bill(usage),
       }
     },
   }

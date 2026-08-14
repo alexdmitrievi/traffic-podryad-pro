@@ -143,6 +143,61 @@ describe('loadEnv', () => {
     )
     expect(() => loadEnv({ ...valid, LLM_PROVIDER: 'openai' })).toThrow('LLM_PROVIDER')
   })
+
+  test('a real DeepSeek key requires prices, the RUB rate and a spend cap', () => {
+    const withKey = {
+      ...valid,
+      LLM_PROVIDER: 'deepseek',
+      DEEPSEEK_API_KEY: 'sk-test-key',
+    }
+
+    expect(() => loadEnv(withKey)).toThrow('DEEPSEEK_INPUT_PRICE_USD_PER_1M')
+    expect(() => loadEnv({ ...withKey, DEEPSEEK_INPUT_PRICE_USD_PER_1M: '0.435' })).toThrow(
+      'DEEPSEEK_OUTPUT_PRICE_USD_PER_1M',
+    )
+    expect(() =>
+      loadEnv({
+        ...withKey,
+        DEEPSEEK_INPUT_PRICE_USD_PER_1M: '0.435',
+        DEEPSEEK_OUTPUT_PRICE_USD_PER_1M: '0.87',
+      }),
+    ).toThrow('DEEPSEEK_USD_TO_RUB_RATE')
+    expect(() =>
+      loadEnv({
+        ...withKey,
+        DEEPSEEK_INPUT_PRICE_USD_PER_1M: '0.435',
+        DEEPSEEK_OUTPUT_PRICE_USD_PER_1M: '0.87',
+        DEEPSEEK_USD_TO_RUB_RATE: '90',
+      }),
+    ).toThrow('LLM_MONTHLY_COST_CAP_RUB')
+
+    const configured = loadEnv({
+      ...withKey,
+      DEEPSEEK_INPUT_PRICE_USD_PER_1M: '0.435',
+      DEEPSEEK_OUTPUT_PRICE_USD_PER_1M: '0.87',
+      DEEPSEEK_USD_TO_RUB_RATE: '90.5',
+      LLM_MONTHLY_COST_CAP_RUB: '1000',
+    })
+    expect(configured.deepseekInputPriceUsdPer1m).toBe(0.435)
+    expect(configured.deepseekOutputPriceUsdPer1m).toBe(0.87)
+    expect(configured.deepseekUsdToRubRate).toBe(90.5)
+    expect(configured.llmMonthlyCostCapMinorUnits).toBe(100_000)
+  })
+
+  test('DeepSeek without a key needs no accounting: no call is possible', () => {
+    const env = loadEnv({ ...valid, LLM_PROVIDER: 'deepseek' })
+    expect(env.deepseekApiKey).toBe('')
+    expect(env.deepseekInputPriceUsdPer1m).toBeNull()
+  })
+
+  test('provider prices and the rate are positive numbers, decimals allowed', () => {
+    expect(() =>
+      loadEnv({ ...valid, DEEPSEEK_INPUT_PRICE_USD_PER_1M: 'free' }),
+    ).toThrow('DEEPSEEK_INPUT_PRICE_USD_PER_1M')
+    expect(() =>
+      loadEnv({ ...valid, DEEPSEEK_USD_TO_RUB_RATE: '0' }),
+    ).toThrow('DEEPSEEK_USD_TO_RUB_RATE')
+  })
 })
 
 describe('the process refuses to boot with a non-zero exit code', () => {

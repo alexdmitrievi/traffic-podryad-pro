@@ -45,6 +45,15 @@ export interface Env {
   deepseekBaseUrl: string
   deepseekModel: string
   deepseekApiKey: string
+  /**
+   * USD per 1M tokens, as billed by the provider (docs/CONTENT_PIPELINE.md "Стоимость и
+   * предохранитель"). Null when not configured — the driver then reports no cost, and a
+   * real key refuses to boot without them.
+   */
+  deepseekInputPriceUsdPer1m: number | null
+  deepseekOutputPriceUsdPer1m: number | null
+  /** RUB per 1 USD, used to convert the USD bill into the RUB-denominated cap. */
+  deepseekUsdToRubRate: number | null
   llmTimeoutMs: number
   llmMaxOutputTokens: number
   /** Kopecks? No — integer minor units, as stored in llm_runs. Null = no cap. */
@@ -232,6 +241,53 @@ function readOptionalPositiveInt(
   return value
 }
 
+/**
+ * Optional positive number, decimals allowed: provider prices per 1M tokens and exchange
+ * rates are fractional by nature, so forcing integers here would force a unit nobody uses.
+ */
+function readOptionalPositiveFloat(
+  source: Record<string, string | undefined>,
+  key: string,
+): number | null {
+  const raw = readString(source, key)
+  if (raw === undefined) return null
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new EnvValidationError([`${key} must be a positive number or empty, got "${raw}"`])
+  }
+  return value
+}
+
+/**
+ * Real DeepSeek calls must be paid for with real money, and a spend that the cap cannot see
+ * is a spend the cap cannot stop. The boot refuses a configured key unless the prices (which
+ * the driver needs to record a cost), the exchange rate (the bill is USD, the cap is RUB)
+ * and the cap itself are all set. Without a key no call is possible, so the refusal fires
+ * exactly when real calls become possible (docs/CONTENT_PIPELINE.md "Стоимость и
+ * предохранитель", WAVE_4_DELEGATION section 6).
+ */
+function validateDeepseekAccounting(
+  llmProvider: 'fake' | 'deepseek',
+  deepseekApiKey: string,
+  inputPriceUsdPer1m: number | null,
+  outputPriceUsdPer1m: number | null,
+  usdToRubRate: number | null,
+  capRub: number | null,
+): void {
+  if (llmProvider !== 'deepseek' || deepseekApiKey === '') return
+  const problems: string[] = []
+  if (inputPriceUsdPer1m === null) problems.push('DEEPSEEK_INPUT_PRICE_USD_PER_1M is required')
+  if (outputPriceUsdPer1m === null) problems.push('DEEPSEEK_OUTPUT_PRICE_USD_PER_1M is required')
+  if (usdToRubRate === null) problems.push('DEEPSEEK_USD_TO_RUB_RATE is required')
+  if (capRub === null) problems.push('LLM_MONTHLY_COST_CAP_RUB is required')
+  if (problems.length > 0) {
+    throw new EnvValidationError([
+      ...problems,
+      'real DeepSeek calls need priced usage and a spend cap; refusing to start',
+    ])
+  }
+}
+
 export function loadEnv(source: Record<string, string | undefined>): Env {
   // Order matters for diagnostics: the fuses and the database URL are validated before
   // anything that depends on them, so a broken guard is reported as the guard, not as a
@@ -256,6 +312,25 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
   // The environment declares the cap in whole rubles; the database stores integer minor
   // units, so the conversion happens once, here.
   const capRub = readOptionalPositiveInt(source, 'LLM_MONTHLY_COST_CAP_RUB')
+  const llmProvider = readLlmProvider(source)
+  const deepseekApiKey = readString(source, 'DEEPSEEK_API_KEY') ?? ''
+  const deepseekInputPriceUsdPer1m = readOptionalPositiveFloat(
+    source,
+    'DEEPSEEK_INPUT_PRICE_USD_PER_1M',
+  )
+  const deepseekOutputPriceUsdPer1m = readOptionalPositiveFloat(
+    source,
+    'DEEPSEEK_OUTPUT_PRICE_USD_PER_1M',
+  )
+  const deepseekUsdToRubRate = readOptionalPositiveFloat(source, 'DEEPSEEK_USD_TO_RUB_RATE')
+  validateDeepseekAccounting(
+    llmProvider,
+    deepseekApiKey,
+    deepseekInputPriceUsdPer1m,
+    deepseekOutputPriceUsdPer1m,
+    deepseekUsdToRubRate,
+    capRub,
+  )
 
   return {
     nodeEnv,
@@ -278,10 +353,13 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
     authCookieSameSite: readAuthCookieSameSite(source),
     corsPublicOrigins,
     corsAppOrigins,
-    llmProvider: readLlmProvider(source),
+    llmProvider,
     deepseekBaseUrl: readString(source, 'DEEPSEEK_BASE_URL') ?? 'https://api.deepseek.com',
     deepseekModel: readString(source, 'DEEPSEEK_MODEL') ?? 'deepseek-v4-pro',
-    deepseekApiKey: readString(source, 'DEEPSEEK_API_KEY') ?? '',
+    deepseekApiKey,
+    deepseekInputPriceUsdPer1m,
+    deepseekOutputPriceUsdPer1m,
+    deepseekUsdToRubRate,
     llmTimeoutMs: readPositiveInt(source, 'LLM_TIMEOUT_MS', 120_000),
     llmMaxOutputTokens: readPositiveInt(source, 'LLM_MAX_OUTPUT_TOKENS', 8192),
     llmMonthlyCostCapMinorUnits: capRub === null ? null : capRub * 100,
