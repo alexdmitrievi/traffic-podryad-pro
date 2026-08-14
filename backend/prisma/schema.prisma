@@ -61,6 +61,9 @@ model Workspace {
   approvals         Approval[]
   llmRuns           LlmRun[]
   auditEntries      AuditLog[]
+  evidenceSources   EvidenceSource[]
+  claims            Claim[]
+  citations         Citation[]
 
   @@map("workspaces")
 }
@@ -95,6 +98,8 @@ model User {
   contentRevisions    ContentRevision[]
   publications        Publication[]
   auditEntries        AuditLog[]
+  evidenceSourcesVerified EvidenceSource[] @relation("EvidenceSourceVerifier")
+  claimsVerified      Claim[]             @relation("ClaimVerifier")
 
   @@index([role], map: "users_role_idx")
   @@map("users")
@@ -834,6 +839,108 @@ model AttributionTouch {
   @@index([leadId], map: "attribution_touches_lead_id_idx")
   @@index([workspaceId, contentItemId], map: "attribution_touches_workspace_id_content_item_id_idx")
   @@map("attribution_touches")
+}
+
+// =============================================================================
+// EVIDENCE REGISTRY (GEO wave, unit 1)
+//
+// Facts a human verified against a source before they can appear in content
+// (README "Следующие шаги" step 5, docs/GEO.md). A claim exists to be cited,
+// not paraphrased: every statement points at a source, and every citation
+// pinpoints where in the source the fact is supported.
+//
+// Rows are immutable. A correction supersedes: it creates a new claim and links
+// the old one to it, so history stays readable and a citation never silently
+// changes its meaning. Only a claim that is verified and not superseded is
+// usable by content; the predicate lives in the evidence module domain.
+// =============================================================================
+
+enum EvidenceSourceKind {
+  official_standard
+  producer_document
+  regulatory_document
+  price_list
+  industry_publication
+  expert_statement
+  other
+
+  @@map("evidence_source_kind")
+}
+
+model EvidenceSource {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  workspaceId  String             @map("workspace_id") @db.Uuid
+  title        String
+  kind         EvidenceSourceKind
+  url          String?
+  publishedAt  DateTime?          @map("published_at")
+  retrievedAt  DateTime?          @map("retrieved_at")
+  /// A source is usable only after a human has checked it. The checker is recorded
+  /// separately from the creator, even when it is the same person.
+  verifiedAt   DateTime?          @map("verified_at")
+  verifiedById String?            @map("verified_by_id") @db.Uuid
+  notes        String?
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "evidence_sources_workspace_id_fkey")
+  verifiedBy User?     @relation("EvidenceSourceVerifier", fields: [verifiedById], references: [id], onDelete: SetNull, map: "evidence_sources_verified_by_id_fkey")
+
+  claims Claim[]
+
+  @@index([workspaceId, kind], map: "evidence_sources_workspace_id_kind_idx")
+  @@map("evidence_sources")
+}
+
+model Claim {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  sourceId       String    @map("source_id") @db.Uuid
+  /// The fact statement in Russian. Never edited in place: a correction is a new
+  /// claim that supersedes this one.
+  statement      String
+  /// SHA-256 of the statement. The deduplication key — a btree unique index over
+  /// long Russian text would exceed the index row size limit.
+  statementHash  String    @map("statement_hash")
+  /// Optional open category (for example "характеристика", "цена"). An open text
+  /// column, not an enum: the vocabulary is a workspace concern.
+  category       String?
+  /// Verified by a human against the source. Only verified, non-superseded claims
+  /// are usable by content.
+  verifiedAt     DateTime? @map("verified_at")
+  verifiedById   String?   @map("verified_by_id") @db.Uuid
+  supersededById String?   @map("superseded_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "claims_workspace_id_fkey")
+  source      EvidenceSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade, map: "claims_source_id_fkey")
+  verifiedBy  User?           @relation("ClaimVerifier", fields: [verifiedById], references: [id], onDelete: SetNull, map: "claims_verified_by_id_fkey")
+  supersededBy Claim?         @relation("ClaimSupersede", fields: [supersededById], references: [id], onDelete: SetNull, map: "claims_superseded_by_id_fkey")
+  supersedes  Claim[]         @relation("ClaimSupersede")
+
+  citations Citation[]
+
+  @@unique([workspaceId, sourceId, statementHash], map: "claims_workspace_id_source_id_statement_hash_key")
+  @@index([workspaceId, createdAt], map: "claims_workspace_id_created_at_idx")
+  @@map("claims")
+}
+
+model Citation {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  claimId     String   @map("claim_id") @db.Uuid
+  /// Where exactly in the source: page, section, table, paragraph — enough for a
+  /// person to find the fact again.
+  location    String
+  /// The supporting excerpt, kept short. Never personal data.
+  quote       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade, map: "claim_citations_workspace_id_fkey")
+  claim     Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "claim_citations_claim_id_fkey")
+
+  @@index([claimId], map: "claim_citations_claim_id_idx")
+  @@map("claim_citations")
 }
 
 // =============================================================================

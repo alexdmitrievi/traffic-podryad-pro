@@ -93,6 +93,9 @@ describe('models', () => {
       'Approval',
       'Lead',
       'AttributionTouch',
+      'EvidenceSource',
+      'Claim',
+      'Citation',
       'LlmRun',
       'AuditLog',
       'TaskOutbox',
@@ -244,6 +247,7 @@ describe('enums match the contracts', () => {
     ['LlmRunPurpose', contracts.llmRuns.llmRunPurposeSchema],
     ['LlmRunStatus', contracts.llmRuns.llmRunStatusSchema],
     ['TaskOutboxStatus', contracts.outbox.taskOutboxStatusSchema],
+    ['EvidenceSourceKind', contracts.evidence.evidenceSourceKindSchema],
   ]
 
   for (const [enumName, zodSchema] of pairs) {

@@ -630,6 +630,108 @@ describe('llm runs', () => {
   })
 })
 
+// ── evidence ─────────────────────────────────────────────────────────────────
+
+describe('evidence', () => {
+  const sourceId = uuid(1)
+  const claimId = uuid(2)
+  const citationId = uuid(3)
+  const verifiedById = uuid(4)
+
+  const validSource = {
+    id: sourceId,
+    workspaceId: uuid(9),
+    title: 'Технические условия производителя',
+    kind: 'producer_document',
+    url: null,
+    publishedAt: null,
+    retrievedAt: null,
+    verifiedAt: null,
+    verifiedById: null,
+    notes: null,
+    claimCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  const validClaim = {
+    id: claimId,
+    workspaceId: uuid(9),
+    sourceId,
+    statement: 'Дизельное топливо поставляется по техническим условиям производителя.',
+    category: 'поставка',
+    verifiedAt: null,
+    verifiedById: null,
+    supersededById: null,
+    status: 'unverified',
+    citations: [
+      { id: citationId, location: 'Раздел 2, таблица 1', quote: 'ТУ 38.001-2026, п. 2.1' },
+    ],
+    createdAt: now,
+  }
+
+  test('a valid source parses', () => {
+    expect(contracts.evidence.evidenceSourceSchema.safeParse(validSource).success).toBe(true)
+  })
+
+  test('an unknown source kind is rejected', () => {
+    expect(
+      contracts.evidence.evidenceSourceSchema.safeParse({ ...validSource, kind: 'blog' }).success,
+    ).toBe(false)
+  })
+
+  test('a valid claim with citations parses', () => {
+    expect(contracts.evidence.claimSchema.safeParse(validClaim).success).toBe(true)
+  })
+
+  test('a claim status outside the three-way set is rejected', () => {
+    expect(
+      contracts.evidence.claimSchema.safeParse({ ...validClaim, status: 'draft' }).success,
+    ).toBe(false)
+  })
+
+  test('a claim without a source cannot be created', () => {
+    const result = contracts.evidence.createClaimSchema.safeParse({
+      statement: validClaim.statement,
+      citations: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  test('a claim statement must be non-empty text', () => {
+    expect(
+      contracts.evidence.createClaimSchema.safeParse({
+        sourceId,
+        statement: '   ',
+      }).success,
+    ).toBe(false)
+  })
+
+  test('supersession payload accepts partial fields and inherits the rest', () => {
+    const result = contracts.evidence.supersedeClaimSchema.safeParse({
+      statement: 'Исправленная формулировка.',
+    })
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual({ statement: 'Исправленная формулировка.' })
+  })
+
+  test('supersession rejects unknown fields', () => {
+    expect(
+      contracts.evidence.supersedeClaimSchema.safeParse({ claimId }).success,
+    ).toBe(false)
+  })
+
+  test('a citation must name a location and may carry a short quote', () => {
+    expect(
+      contracts.evidence.claimCitationInputSchema.safeParse({ location: 'стр. 3', quote: 'цитата' })
+        .success,
+    ).toBe(true)
+    expect(contracts.evidence.claimCitationInputSchema.safeParse({ quote: 'без места' }).success).toBe(
+      false,
+    )
+  })
+})
+
 // ── the tree itself ──────────────────────────────────────────────────────────
 
 describe('contract tree', () => {
@@ -642,6 +744,7 @@ describe('contract tree', () => {
       'common',
       'content',
       'errors',
+      'evidence',
       'leads',
       'llmRuns',
       'outbox',

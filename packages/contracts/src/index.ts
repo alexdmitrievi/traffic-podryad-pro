@@ -25,6 +25,7 @@ import * as catalog from './catalog'
 import * as common from './common'
 import * as content from './content'
 import * as errors from './errors'
+import * as evidence from './evidence'
 import * as keywords from './keywords'
 import * as llmRuns from './llm-runs'
 import * as leads from './leads'
@@ -68,6 +69,9 @@ export const contracts = {
   leads,
   attribution,
 
+  /** Facts a human verified against a source before content may use them (GEO wave). */
+  evidence,
+
   /** Model usage and its cost. */
   llmRuns,
 
@@ -84,6 +88,7 @@ export * from './catalog'
 export * from './common'
 export * from './content'
 export * from './errors'
+export * from './evidence'
 export * from './keywords'
 export * from './leads'
 export * from './llm-runs'

@@ -224,9 +224,10 @@ MVP-срез **работает локально целиком**: заявка 
    PostgreSQL, Object Storage, CDN, DNS/TLS по [docs/DOMAINS.md](docs/DOMAINS.md),
    секреты в хранилище площадки. Staging с `X-Robots-Tag: noindex`.
 5. **GEO-волна (следующая крупная)** — расширение конвейера, не «хак»: реестр
-   `EvidenceSource`/`Claim`/`Citation` (подтверждённые факты до генерации драфта),
-   вопросный инвентарь `GEOQuery`, ручные снимки `GEOVisibilitySnapshot`, ответные
-   ассеты с цитатами. Без массовой генерации страниц и без манипуляций моделями.
+   `EvidenceSource`/`Claim`/`Citation` (подтверждённые факты до генерации драфта) —
+   **юнит 1 реализован**; вопросный инвентарь `GEOQuery`, ручные снимки
+   `GEOVisibilitySnapshot`, ответные ассеты с цитатами — следующие юниты, см.
+   [docs/GEO.md](docs/GEO.md). Без массовой генерации страниц и без манипуляций моделями.
 6. **Контент-фабрика** — `ContentVariant` от одного одобренного брифа: сайт-статья,
    адаптация, сценарий, short-form, FAQ, GEO-ответ, CTA-блок; claims варианта обязаны
    быть подмножеством verified claims канона.
@@ -266,6 +267,7 @@ MVP-срез **работает локально целиком**: заявка 
 | [docs/PETROLEUM_TAXONOMY.md](docs/PETROLEUM_TAXONOMY.md) | Товарная таксономия ниши и правила достоверности |
 | [docs/DOMAINS.md](docs/DOMAINS.md) | DNS, TLS, CORS, cookie, окружения |
 | [docs/WEB_SURFACES.md](docs/WEB_SURFACES.md) | Что живёт на сайте, что в приложении |
+| [docs/GEO.md](docs/GEO.md) | GEO-волна: реестр фактов, вопросы, снимки видимости, ответные ассеты |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Yandex Cloud: целевая архитектура, бэкапы, секреты, откат |
 | [docs/LOCAL_DATABASE.md](docs/LOCAL_DATABASE.md) | Локальный PostgreSQL в Docker Compose |
 | [docs/STORAGE.md](docs/STORAGE.md) | Порт хранилища, приватные и публичные объекты |
