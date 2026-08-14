@@ -34,6 +34,20 @@ export const changeRoleRequestSchema = z
   })
   .strict()
 
+/**
+ * An administrator creates an account. The role defaults to `viewer`: privilege is granted
+ * explicitly, never by accident, and the bootstrapping of the very first admin happens
+ * through the `create-admin` entrypoint, not through the API.
+ */
+export const createUserRequestSchema = z
+  .object({
+    email: z.email().trim().toLowerCase().max(254),
+    password: z.string().min(12, 'password must be at least 12 characters').max(128),
+    displayName: z.string().trim().min(2).max(80).optional(),
+    role: userRoleSchema.optional(),
+  })
+  .strict()
+
 export const userListResponseSchema = z.object({
   users: z.array(userSchema),
 })

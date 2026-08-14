@@ -10,6 +10,10 @@ const valid: Record<string, string | undefined> = {
   OUTBOUND_MESSAGING_ENABLED: 'false',
   PII_TO_LLM_ALLOWED: 'false',
   AUTH_COOKIE_SECURE: 'false',
+  JWT_SECRET: 'local_test_jwt_secret_0123456789',
+  AUTH_COOKIE_PATH: '/',
+  CORS_PUBLIC_ORIGINS: 'http://localhost:4321',
+  CORS_APP_ORIGINS: 'http://localhost:5173',
 }
 
 describe('loadEnv', () => {
@@ -72,6 +76,56 @@ describe('loadEnv', () => {
     expect(() => loadEnv({ ...valid, PORT: 'not-a-number' })).toThrow('PORT')
     expect(() => loadEnv({ ...valid, PORT: '70000' })).toThrow('PORT')
     expect(loadEnv({ ...valid, PORT: '8081' }).port).toBe(8081)
+  })
+
+  test('JWT_SECRET is required, long enough and never the placeholder', () => {
+    const { JWT_SECRET: _removed, ...rest } = valid
+    expect(() => loadEnv({ ...rest })).toThrow('JWT_SECRET')
+    expect(() => loadEnv({ ...valid, JWT_SECRET: 'REPLACE_ME' })).toThrow('JWT_SECRET')
+    expect(() => loadEnv({ ...valid, JWT_SECRET: 'short' })).toThrow('JWT_SECRET')
+  })
+
+  test('the auth cookie path is locked to "/"', () => {
+    expect(loadEnv({ ...valid }).authCookiePath).toBe('/')
+    expect(() => loadEnv({ ...valid, AUTH_COOKIE_PATH: '/api/auth' })).toThrow('AUTH_COOKIE_PATH')
+    expect(() => loadEnv({ ...valid, AUTH_COOKIE_PATH: '' })).toThrow('AUTH_COOKIE_PATH')
+  })
+
+  test('the auth cookie SameSite is lax or strict only', () => {
+    expect(loadEnv({ ...valid }).authCookieSameSite).toBe('lax')
+    expect(loadEnv({ ...valid, AUTH_COOKIE_SAMESITE: 'strict' }).authCookieSameSite).toBe('strict')
+    expect(() => loadEnv({ ...valid, AUTH_COOKIE_SAMESITE: 'none' })).toThrow('AUTH_COOKIE_SAMESITE')
+  })
+
+  test('TTLs and rate limits parse with documented defaults', () => {
+    const env = loadEnv({ ...valid })
+    expect(env.accessTokenTtlSeconds).toBe(900)
+    expect(env.refreshTokenTtlDays).toBe(30)
+    expect(env.sessionAbsoluteTtlDays).toBe(90)
+    expect(env.authRateLimitMax).toBe(20)
+    expect(loadEnv({ ...valid, ACCESS_TOKEN_TTL_SECONDS: '60' }).accessTokenTtlSeconds).toBe(60)
+    expect(() => loadEnv({ ...valid, ACCESS_TOKEN_TTL_SECONDS: '0' })).toThrow('ACCESS_TOKEN_TTL_SECONDS')
+  })
+
+  test('CORS origins are exact http(s) origins, comma-separated', () => {
+    expect(loadEnv({ ...valid }).corsAppOrigins).toEqual(['http://localhost:5173'])
+    expect(
+      loadEnv({ ...valid, CORS_PUBLIC_ORIGINS: 'https://pipupi.ru, http://localhost:4321' })
+        .corsPublicOrigins,
+    ).toEqual(['https://pipupi.ru', 'http://localhost:4321'])
+
+    expect(() => loadEnv({ ...valid, CORS_APP_ORIGINS: '*' })).toThrow('CORS_APP_ORIGINS')
+    expect(() => loadEnv({ ...valid, CORS_APP_ORIGINS: '' })).toThrow('CORS_APP_ORIGINS')
+  })
+
+  test('the two CORS policies must not overlap', () => {
+    expect(() =>
+      loadEnv({
+        ...valid,
+        CORS_PUBLIC_ORIGINS: 'https://pipupi.ru',
+        CORS_APP_ORIGINS: 'https://pipupi.ru',
+      }),
+    ).toThrow('must not overlap')
   })
 })
 

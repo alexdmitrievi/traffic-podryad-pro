@@ -14,6 +14,11 @@ import type { Db } from '../../src/db'
 
 let db: Db
 
+const cors = {
+  publicOrigins: ['http://localhost:4321'],
+  appOrigins: ['http://localhost:5173'],
+}
+
 describe('health against a migrated database', () => {
   beforeAll(() => {
     db = createTestDb()
@@ -40,6 +45,7 @@ describe('health against a migrated database', () => {
         ping: () => pingDatabase(db),
         migrationsApplied: () => migrationsApplied(db),
       },
+      cors,
     })
 
     const response = await app.request('/health/ready')
@@ -47,39 +53,42 @@ describe('health against a migrated database', () => {
     expect(await response.json()).toEqual({ status: 'ready' })
   })
 
-  test('/health/ready is negative on a database without migrations', async () => {
-    const scratchName = 'pipupi_test_scratch'
-    const baseUrl = testDatabaseUrl()
-    const scratchUrl = baseUrl.replace(/\/[^/]+$/, `/${scratchName}`)
+  test(
+    '/health/ready is negative on a database without migrations',
+    async () => {
+      const scratchName = 'pipupi_test_scratch'
+      const baseUrl = testDatabaseUrl()
+      const scratchUrl = baseUrl.replace(/\/[^/]+$/, `/${scratchName}`)
 
-    const admin = new Client({ connectionString: baseUrl })
-    await admin.connect()
-    await admin.query(`DROP DATABASE IF EXISTS ${scratchName}`)
-    await admin.query(`CREATE DATABASE ${scratchName}`)
-    await admin.end()
+      const admin = new Client({ connectionString: baseUrl })
+      await admin.connect()
 
-    const scratchDb = createDb(scratchUrl)
-    try {
-      expect(await pingDatabase(scratchDb)).toBe(true)
-      expect(await migrationsApplied(scratchDb)).toBe(false)
+      const scratchDb = createDb(scratchUrl)
+      try {
+        await admin.query(`DROP DATABASE IF EXISTS ${scratchName}`)
+        await admin.query(`CREATE DATABASE ${scratchName}`)
 
-      const app = createApp({
-        probe: {
-          ping: () => pingDatabase(scratchDb),
-          migrationsApplied: () => migrationsApplied(scratchDb),
-        },
-      })
+        expect(await pingDatabase(scratchDb)).toBe(true)
+        expect(await migrationsApplied(scratchDb)).toBe(false)
 
-      const response = await app.request('/health/ready')
-      expect(response.status).toBe(503)
-      expect(await response.json()).toEqual({ status: 'not_ready', reason: 'migrations_pending' })
-    } finally {
-      await scratchDb.$disconnect()
+        const app = createApp({
+          probe: {
+            ping: () => pingDatabase(scratchDb),
+            migrationsApplied: () => migrationsApplied(scratchDb),
+          },
+          cors,
+        })
 
-      const cleanup = new Client({ connectionString: baseUrl })
-      await cleanup.connect()
-      await cleanup.query(`DROP DATABASE IF EXISTS ${scratchName}`)
-      await cleanup.end()
-    }
-  })
+        const response = await app.request('/health/ready')
+        expect(response.status).toBe(503)
+        expect(await response.json()).toEqual({ status: 'not_ready', reason: 'migrations_pending' })
+      } finally {
+        await scratchDb.$disconnect()
+        await admin.query(`DROP DATABASE IF EXISTS ${scratchName}`)
+        await admin.end()
+      }
+    },
+    // Two DROP/CREATE DATABASE round-trips plus pool teardown: generous budget on purpose.
+    20_000,
+  )
 })

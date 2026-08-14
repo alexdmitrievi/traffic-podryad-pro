@@ -40,7 +40,11 @@ export const forbiddenIdentifiers = ['web-app-demo', 'web_app_demo', 'vibecoding
  * second, deliberate change in a different file from the one being excused.
  */
 export const fixtureExemptions = {
-  'secret-scan': ['scripts/check-secrets.test.mjs'],
+  'secret-scan': [
+    'scripts/check-secrets.test.mjs',
+    // The auth integration suite presents fake passwords to the login endpoint by design.
+    'backend/tests/integration/auth.integration.test.ts',
+  ],
   'architecture-check': ['scripts/architecture-check.test.mjs'],
 }
 

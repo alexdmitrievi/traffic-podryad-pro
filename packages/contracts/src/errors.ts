@@ -22,6 +22,12 @@ export const apiErrorCodeSchema = z.enum([
   // what to do rather than "something went wrong".
   'AUTH_INVALID_CREDENTIALS',
   'AUTH_SESSION_EXPIRED',
+  // A refresh credential reused outside the rotation race window: the session was revoked.
+  'AUTH_SESSION_COMPROMISED',
+  // A state-changing request whose Origin header is not in the allowlist for its policy.
+  'ORIGIN_REJECTED',
+  // The zero-admins invariant: the last admin cannot be demoted.
+  'LAST_ADMIN',
 
   // Approval and publication. These carry the product's central invariant, so they are
   // distinguishable from a generic CONFLICT: the operator needs to know whether the content

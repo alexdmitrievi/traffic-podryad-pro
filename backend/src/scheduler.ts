@@ -17,7 +17,7 @@ export function isDue(lastRunMs: number | null, everyMinutes: number, nowMs: num
 
 export interface SchedulerDeps {
   jobs: readonly JobDefinition[]
-  handlers: JobHandlerRegistry
+  handlers: Partial<JobHandlerRegistry>
   logger?: Logger
   tickMs?: number
   sleep?: (ms: number) => Promise<void>
@@ -43,8 +43,13 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       const nowMs = now()
       for (const job of deps.jobs) {
         if (!isDue(lastRun.get(job.name) ?? null, job.everyMinutes, nowMs)) continue
+        const handler = deps.handlers[job.name]
+        if (!handler) {
+          logger.error(`[scheduler] job ${job.name} has no registered handler; skipping`)
+          continue
+        }
         try {
-          await deps.handlers[job.name]()
+          await handler()
           // The window restarts only after a successful run: a failing job stays due and
           // is retried on the next tick rather than silently skipping its window.
           lastRun.set(job.name, nowMs)

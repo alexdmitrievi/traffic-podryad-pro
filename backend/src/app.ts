@@ -13,6 +13,9 @@
  */
 
 import { Hono } from 'hono'
+import { createCorsMiddleware } from './cors'
+import type { CorsConfig } from './cors'
+import { createOriginCheckMiddleware } from './origin-check'
 
 export interface HealthProbe {
   ping(): Promise<boolean>
@@ -21,10 +24,16 @@ export interface HealthProbe {
 
 export interface AppDeps {
   probe: HealthProbe
+  cors: CorsConfig
 }
 
 export function createApp(deps: AppDeps): Hono {
   const app = new Hono()
+
+  // Applied before any route so both middlewares cover every endpoint registered later,
+  // including the ones modules mount at runtime.
+  app.use('*', createCorsMiddleware(deps.cors))
+  app.use('*', createOriginCheckMiddleware(deps.cors))
 
   app.get('/health', (c) => c.json({ status: 'ok' }))
 

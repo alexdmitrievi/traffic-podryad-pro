@@ -2,6 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import { createApp } from './app'
 import type { HealthProbe } from './app'
 
+const cors = {
+  publicOrigins: ['http://localhost:4321'],
+  appOrigins: ['http://localhost:5173'],
+}
+
 /**
  * The probe that proves the liveness contract: every method throws, so any route that
  * touches the database fails the test instead of returning a false green.
@@ -17,14 +22,14 @@ const poisonedProbe: HealthProbe = {
 
 describe('health routes', () => {
   test('/health answers without touching the database', async () => {
-    const app = createApp({ probe: poisonedProbe })
+    const app = createApp({ probe: poisonedProbe, cors })
     const response = await app.request('/health')
 
     expect(response.status).toBe(200)
   })
 
   test('/health/live answers without touching the database', async () => {
-    const app = createApp({ probe: poisonedProbe })
+    const app = createApp({ probe: poisonedProbe, cors })
     const response = await app.request('/health/live')
 
     expect(response.status).toBe(200)
@@ -38,6 +43,7 @@ describe('health routes', () => {
           throw new Error('must not be reached when ping fails')
         },
       },
+      cors,
     })
 
     const response = await app.request('/health/ready')
@@ -48,6 +54,7 @@ describe('health routes', () => {
   test('/health/ready is negative while migrations are pending', async () => {
     const app = createApp({
       probe: { ping: async () => true, migrationsApplied: async () => false },
+      cors,
     })
 
     const response = await app.request('/health/ready')
@@ -58,6 +65,7 @@ describe('health routes', () => {
   test('/health/ready is positive when the database answers and migrations are applied', async () => {
     const app = createApp({
       probe: { ping: async () => true, migrationsApplied: async () => true },
+      cors,
     })
 
     const response = await app.request('/health/ready')
@@ -73,6 +81,7 @@ describe('health routes', () => {
         },
         migrationsApplied: async () => true,
       },
+      cors,
     })
 
     const response = await app.request('/health/ready')

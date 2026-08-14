@@ -19,7 +19,8 @@ describe('jobs registry', () => {
   test('importing the registry needs no database and no generated client', async () => {
     const { jobs } = await import('./jobs')
 
-    expect(jobs.map((job) => job.name)).toEqual(['outbox.drain'])
+    expect(jobs.map((job) => job.name)).toEqual(['outbox.drain', 'auth.sessions.cleanup'])
     expect(jobs[0]?.everyMinutes).toBe(1)
+    expect(jobs[1]?.everyMinutes).toBe(24 * 60)
   })
 })

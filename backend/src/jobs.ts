@@ -20,4 +20,5 @@ export interface JobDefinition {
 
 export const jobs: readonly JobDefinition[] = [
   { name: 'outbox.drain', everyMinutes: 1 },
+  { name: 'auth.sessions.cleanup', everyMinutes: 24 * 60 },
 ]

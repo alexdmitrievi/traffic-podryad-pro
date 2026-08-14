@@ -8,6 +8,7 @@
     "api": "bun src/entrypoints/api.ts",
     "worker": "bun src/entrypoints/worker.ts",
     "cron": "bun src/entrypoints/cron.ts",
+    "create:admin": "bun src/entrypoints/create-admin.ts",
     "typecheck": "tsc --noEmit",
     "build": "bun build src/entrypoints/api.ts src/entrypoints/worker.ts src/entrypoints/cron.ts --outdir dist --target bun --external pg --external @prisma/client --external @prisma/adapter-pg",
     "test": "bun test src",
@@ -31,6 +32,7 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "hono": "^4.13.2",
+    "jose": "^6.2.8",
     "pg": "^8.23.0"
   }
 }

@@ -8,6 +8,12 @@
  * fixed by deleting the file. It stays in Git history and has to be revoked and reissued.
  * The cheapest moment to catch it is before the commit.
  *
+ * Files that git itself ignores (`.env`, generated output) are outside the scanner: they
+ * cannot enter the repository, and the local `.env` is exactly where real secrets live by
+ * design. The filter asks git directly and fails safe — if git is unavailable or errors,
+ * everything is scanned. `.env.example` is not ignored and stays under the scanner, which
+ * is what keeps the placeholders honest.
+ *
  * On self-matching: the detection patterns below are written so they do not match their
  * own source text. Every pattern is anchored on a literal prefix followed by a character
  * class, and `[` is never a member of that class, so the pattern source cannot satisfy it.
@@ -16,6 +22,7 @@
  */
 
 import { readdir, readFile, stat } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -173,6 +180,32 @@ function lineOf(source, offset) {
   return source.slice(0, offset).split('\n').length
 }
 
+/**
+ * Files git ignores cannot enter the repository. The default runner asks git directly
+ * (`check-ignore`); a custom runner is injected by the tests. Failing safe: when git is
+ * unavailable or errors, the filter returns an empty set and everything is scanned.
+ */
+export function filterIgnored(relativePaths, checkIgnore = defaultCheckIgnore) {
+  const ignored = checkIgnore(relativePaths)
+  return relativePaths.filter((entry) => !ignored.has(entry))
+}
+
+function defaultCheckIgnore(relativePaths) {
+  if (relativePaths.length === 0) return new Set()
+  try {
+    const result = spawnSync('git', ['check-ignore', '--stdin', '-z'], {
+      cwd: repositoryRoot,
+      input: relativePaths.join('\0'),
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+    })
+    if (result.error || result.status === null || result.status > 1) return new Set()
+    return new Set(result.stdout.split('\0').filter(Boolean))
+  } catch {
+    return new Set()
+  }
+}
+
 async function collectFiles(directory) {
   let entries
   try {
@@ -203,11 +236,16 @@ async function collectFiles(directory) {
 
 async function main() {
   const paths = await collectFiles(repositoryRoot)
+  const relativePaths = paths.map((filePath) =>
+    path.relative(repositoryRoot, filePath).replaceAll(path.sep, '/'),
+  )
+  const scannedPaths = filterIgnored(relativePaths)
+
   const files = []
-  for (const filePath of paths) {
+  for (const filePath of scannedPaths) {
     files.push({
-      path: path.relative(repositoryRoot, filePath),
-      source: await readFile(filePath, 'utf8'),
+      path: filePath,
+      source: await readFile(path.join(repositoryRoot, filePath), 'utf8'),
     })
   }
 

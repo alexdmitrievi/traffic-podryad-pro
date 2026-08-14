@@ -16,6 +16,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   FIXTURE_MARKER,
   credentialPatterns,
+  filterIgnored,
   hasFixtureMarker,
   isPlaceholder,
   scanFiles,
@@ -97,6 +98,30 @@ describe('legitimate content is not flagged', () => {
 
   test('an empty repository produces no findings', () => {
     expect(scanFiles([])).toEqual([])
+  })
+})
+
+describe('git-ignored files stay outside the scanner', () => {
+  test('a path git ignores is filtered out; a tracked file stays', () => {
+    const runner = (paths) => new Set(['backend/.env'])
+
+    expect(filterIgnored(['backend/.env', 'backend/.env.example'], runner)).toEqual([
+      'backend/.env.example',
+    ])
+  })
+
+  test('when git answers nothing, everything stays in', () => {
+    const runner = () => new Set()
+
+    expect(filterIgnored(['backend/.env'], runner)).toEqual(['backend/.env'])
+  })
+
+  test('a failing git fallback scans everything rather than skipping anything', () => {
+    const runner = () => new Set()
+
+    expect(filterIgnored(['scripts/check-secrets.mjs'], runner)).toEqual([
+      'scripts/check-secrets.mjs',
+    ])
   })
 })
 

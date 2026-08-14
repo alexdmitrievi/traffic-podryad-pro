@@ -13,6 +13,8 @@ import { createApp } from './app'
 import { createDb, migrationsApplied, pingDatabase } from './db'
 import type { Env } from './env'
 import { jobs } from './jobs'
+import { createAuthModule, createSessionCleanup } from './modules/auth'
+import { createUsersModule } from './modules/users'
 import { createDrainLoop, drainOnce } from './outbox/drain-loop'
 import type { DrainLoop, TaskHandlerRegistry } from './outbox/drain-loop'
 import { createOutbox } from './outbox/outbox-service'
@@ -42,7 +44,42 @@ export function createRuntime(env: Env): Runtime {
       ping: () => pingDatabase(db),
       migrationsApplied: () => migrationsApplied(db),
     },
+    cors: {
+      publicOrigins: env.corsPublicOrigins,
+      appOrigins: env.corsAppOrigins,
+    },
   })
+
+  const auth = createAuthModule({
+    db,
+    jwtSecret: env.jwtSecret,
+    settings: {
+      accessTokenTtlSeconds: env.accessTokenTtlSeconds,
+      refreshTokenTtlDays: env.refreshTokenTtlDays,
+      sessionAbsoluteTtlDays: env.sessionAbsoluteTtlDays,
+      rotationRaceWindowMs: 30_000,
+    },
+    cookie: {
+      name: env.authCookieName,
+      path: env.authCookiePath,
+      sameSite: env.authCookieSameSite,
+      secure: env.authCookieSecure,
+    },
+    refreshTokenTtlDays: env.refreshTokenTtlDays,
+    rateLimit: {
+      max: env.authRateLimitMax,
+      windowMs: env.authRateLimitWindowSeconds * 1000,
+      trustedProxyIpHeader: env.trustedProxyClientIpHeader,
+    },
+  })
+
+  const users = createUsersModule({
+    db,
+    auth: { requireAuth: auth.requireAuth, requireRole: auth.requireRole },
+  })
+
+  app.route('/api/auth', auth.routes)
+  app.route('/api/users', users.routes)
 
   const taskHandlers: TaskHandlerRegistry = {}
   const drainDeps = { outbox, handlers: taskHandlers }
@@ -51,6 +88,7 @@ export function createRuntime(env: Env): Runtime {
     'outbox.drain': async () => {
       await drainOnce(drainDeps)
     },
+    'auth.sessions.cleanup': createSessionCleanup(db, env.sessionRetentionDays),
   }
 
   return {
