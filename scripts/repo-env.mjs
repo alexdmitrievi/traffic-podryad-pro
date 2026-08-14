@@ -44,8 +44,9 @@ export const fixtureExemptions = {
     'scripts/check-secrets.test.mjs',
     // The auth integration suite presents fake passwords to the login endpoint by design.
     'backend/tests/integration/auth.integration.test.ts',
-    // The E2E scenario signs in with a fake admin credential by design.
+    // The E2E scenarios sign in with a fake admin credential by design.
     'webapp/e2e/pipeline.spec.ts',
+    'webapp/e2e/evidence.spec.ts',
   ],
   'architecture-check': ['scripts/architecture-check.test.mjs'],
 }
